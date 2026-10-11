@@ -7,7 +7,8 @@
 //  - `taxonomyId=<id>` beperkt tot een categorie; het facet `taxonomy` in het antwoord geeft de kinderen met id + naam.
 //  - Daarom: bonus per categorie ophalen (root + elke facet-categorie, plus 3 sorteringen op root), referentie =
 //    niet-bonus producten uit de categorieen (subCategory) waar een aanbieding in zit.
-//  - AH Online-acties (promotionType AHONLINE, virtuele pakketten, bonusEndDate 2999) zijn geen winkelbonus: overgeslagen.
+//  - AH Online-acties (promotionType AHONLINE, virtuele pakketten) zijn geen winkelbonus: mee met `online: true`, tenzij
+//    bonusEndDate 2999 (permanente staffelkorting, 1380 stuks op 2026-10-11): die blijven weg.
 //
 // Gebruik: node winkels/ah.mjs        (env MAX_REQ = maximaal aantal requests, standaard 400; PAUZE = ms, standaard 220)
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -154,6 +155,10 @@ function maakProduct(p, isAanbieding) {
 const winkelBonus = (p) =>
   p.isBonus && !p.isVirtualBundle && p.promotionType !== 'AHONLINE' && p.segmentType !== 'AHOO' && p.shopType === 'AH' &&
   !/^2999/.test(p.bonusEndDate || '');
+// Online-acties (AH Online, virtuele pakketten zoals "4-pack", "volume voordeel") met een echte einddatum: wel mee, met `online: true`.
+// Die met einddatum 2999 zijn permanente staffelkortingen en geen aanbieding: blijven weg.
+const onlineBonus = (p) =>
+  p.isBonus && p.promotionType === 'AHONLINE' && p.shopType === 'AH' && !/^2999/.test(p.bonusEndDate || '');
 
 // ---------- crawl ----------
 const bonusProducten = new Map(); // webshopId -> ruw product
@@ -221,15 +226,17 @@ async function main() {
       gezien.add(k.id);
       await haalBonus({ taxonomyId: String(k.id) }, k.id);
     }
-    console.log(`bonus-fase klaar: ${bonusProducten.size} bonusproducten, ${[...bonusProducten.values()].filter(winkelBonus).length} winkelbonus, ${requests} requests`);
+    console.log(`bonus-fase klaar: ${bonusProducten.size} bonusproducten, ${[...bonusProducten.values()].filter(winkelBonus).length} winkelbonus, ${[...bonusProducten.values()].filter((p) => !winkelBonus(p) && onlineBonus(p)).length} online,${requests} requests`);
   } catch (e) {
     if (e instanceof Budget) afgebroken = e.message; else throw e;
   }
 
   const aanbiedingen = [];
   for (const p of bonusProducten.values()) {
-    if (!winkelBonus(p)) continue;
+    const online = !winkelBonus(p);
+    if (online && !onlineBonus(p)) continue;
     const o = maakProduct(p, true);
+    if (o && online) o.online = true;
     if (o && !(o.normaalPrijs != null && o.prijs > o.normaalPrijs * 1.001)) aanbiedingen.push(o);
   }
 

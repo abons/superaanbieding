@@ -164,4 +164,11 @@ assert.equal(fx.winkels.length, 2);
 const tel = new Set(beoordeel(fx.winkels).map((x) => x.oordeel));
 for (const o of ['beste', 'goed','huismerk-goedkoper', 'merk-goedkoper', 'onbekend']) assert.ok(tel.has(o), 'fixtures missen ' + o);
 
+// online-vlag: blijft in de compacte vorm als true, ontbreekt anders.
+{
+  const uit = inkort(beoordeel([w('ah', [p({ id: 'on', titel: 'on', online: true }), p({ id: 'of', titel: 'of' })])]));
+  assert.equal(uit.aanbiedingen.find((x) => x.titel === 'on').online, true);
+  assert.equal(uit.aanbiedingen.filter((x) => x.online).length, 1);
+}
+
 console.log('test.mjs: alles ok');

@@ -104,7 +104,9 @@ function maakProduct(p, aanbieding) {
   const ppeNorm = pr.pricePerUnit?.price != null ? euro(pr.pricePerUnit.price) : null;
   const eh = eenheid(pr.pricePerUnit?.unit);
   const promo = aanbieding ? (p.promotions || []).find(x => x.tags?.length) : null;
-  const tags = (promo?.tags || []).map(t => t.text).filter(t => t && !/^alleen online$/i.test(t.trim()));
+  const alleTags = (promo?.tags || []).map(t => t.text).filter(Boolean);
+  const online = alleTags.some(t => /^alleen online$/i.test(t.trim()));
+  const tags = alleTags.filter(t => !/^alleen online$/i.test(t.trim()));
   const tekst = tags.join(', ') || null;
 
   let prijs = norm;
@@ -132,6 +134,7 @@ function maakProduct(p, aanbieding) {
     mechanisme: tekst,
     geldigTot: aanbieding && promo?.end?.iso ? promo.end.iso.slice(0, 10) : null,
     afbeelding: p.image && p.image.startsWith('https://') ? p.image : null,
+    ...(online ? { online: true } : {}),
   };
 }
 

@@ -134,7 +134,7 @@ export function inkort(aanbiedingen) {
   }
   const lijst = aanbiedingen.map((a) => {
     const u = { winkel: a.winkel, titel: a.titel, prijs: a.prijs, oordeel: a.oordeel, familie: a.familie || 'Overig' };
-    for (const k of ['merk', 'categorie', 'inhoud', 'eenheid', 'normaalPrijs', 'prijsPerEenheid', 'mechanisme', 'geldigTot', 'afbeelding', 'besparing']) {
+    for (const k of ['merk', 'categorie', 'inhoud', 'eenheid', 'normaalPrijs', 'prijsPerEenheid', 'mechanisme', 'geldigTot', 'afbeelding', 'besparing', 'online']) {
       if (a[k] !== null && a[k] !== undefined && a[k] !== 0 && a[k] !== '') u[k] = a[k];
     }
     const vn = voorNa[a.winkel];

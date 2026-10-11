@@ -76,6 +76,7 @@ li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radiu
   <div class="bar">
     <input type="search" id="zoek" placeholder="Zoek op product of merk" aria-label="Zoeken" autocomplete="off">
     <div class="rij" id="winkels" role="group" aria-label="Supermarkt"></div>
+    <div class="rij" id="kanalen" role="group" aria-label="Winkel of online"></div>
     <div class="rij" id="oordelen" role="group" aria-label="Oordeel"></div>
     <div class="rij twee"><select id="familie" aria-label="Productfamilie"></select><select id="sorteer" aria-label="Sorteren">
       <option value="besparing">Sorteer: grootste besparing</option>
@@ -92,7 +93,8 @@ const PAGINA = 60; // kaarten per keer in de DOM
 let DATA = { winkels: [], aanbiedingen: [], alternatieven: [], afbeeldingen: {} };
 
 const OORDELEN = [['', 'Alles'], ['beste', 'Beste deal'], ['goed', 'Goede deal'],['huismerk-goedkoper', 'Huismerk goedkoper'], ['merk-goedkoper', 'Merk goedkoper'], ['onbekend', 'Geen vergelijking']];
-const RANG = { beste: 0, goed: 1, 'huismerk-goedkoper': 2, 'merk-goedkoper': 2, onbekend: 3 }; // bij gelijke besparing: beste deals eerst
+const KANALEN = [['', 'Winkel en online'], ['winkel', 'In de winkel'], ['online', 'Alleen online']];
+const RANG ={ beste: 0, goed: 1, 'huismerk-goedkoper': 2, 'merk-goedkoper': 2, onbekend: 3 }; // bij gelijke besparing: beste deals eerst
 const BADGE = { 'beste': 'Beste deal', 'goed':'Goede deal', 'huismerk-goedkoper': 'Huismerk goedkoper', 'merk-goedkoper': 'Merk goedkoper', 'onbekend': 'Geen goede vergelijking' };
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
 const EENHEID = { kg: 'kg', l: 'l', stuk: 'stuk' };
@@ -105,12 +107,14 @@ let winkelNamen = new Map();
 const toestand = {
   winkels: new Set(opslag.lees('winkels', [])), // leeg = alle (onbekende ids worden na het laden opgeschoond)
   oordeel: opslag.lees('oordeel', ''),
+  kanaal: opslag.lees('kanaal', ''),
   familie: String(opslag.lees('familie', '')), // '' = alle families
   sorteer: opslag.lees('sorteer', 'besparing'),
   zoek: '',
   zichtbaar: PAGINA,
 };
 if (!OORDELEN.some(([k]) => k === toestand.oordeel)) toestand.oordeel = '';
+if (!KANALEN.some(([k]) => k === toestand.kanaal)) toestand.kanaal = '';
 if (!['besparing', 'prijs'].includes(toestand.sorteer)) toestand.sorteer = 'besparing';
 
 const el = (naam, attr = {}, tekst) => {
@@ -139,6 +143,14 @@ function chips() {
     };
     w.append(b);
   }
+  const k = $('kanalen'); k.replaceChildren();
+  const nOnline = DATA.aanbiedingen.filter((a) => a.online).length;
+  for (const [id, naam] of KANALEN) {
+    const b = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(toestand.kanaal === id) }, naam);
+    if (id) b.append(el('small', {}, String(id === 'online' ? nOnline : DATA.aanbiedingen.length - nOnline)));
+    b.onclick = () => { toestand.kanaal = id; opslag.schrijf('kanaal', id); chips(); teken(); };
+    k.append(b);
+  }
   const o = $('oordelen'); o.replaceChildren();
   for (const [k, naam] of OORDELEN) {
     const b = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(toestand.oordeel === k) }, naam);
@@ -159,7 +171,7 @@ function kaart(a) {
   } else plaatje.textContent = (a.titel || '?').trim().charAt(0).toUpperCase();
   const t = el('div');
   t.append(el('div', { class: 'titel' }, a.titel));
-  t.append(el('div', { class: 'meta' }, [winkelNamen.get(a.winkel) || a.winkel, a.merk, a.inhoud, a.familie && a.familie !== 'Overig' ? a.familie : ''].filter(Boolean).join(' · ')));
+  t.append(el('div', { class: 'meta' }, [winkelNamen.get(a.winkel) || a.winkel, a.online ? 'online' : '', a.merk, a.inhoud, a.familie && a.familie !== 'Overig' ? a.familie : ''].filter(Boolean).join(' · ')));
   const p = el('div', { class: 'prijzen' });
   p.append(el('span', { class: 'prijs' }, euro.format(a.prijs)));
   if (a.normaalPrijs && a.normaalPrijs > a.prijs) p.append(el('span', { class: 'oud' }, euro.format(a.normaalPrijs)));
@@ -190,6 +202,7 @@ function teken() {
   const basis = DATA.aanbiedingen.filter((a) =>
     (!toestand.winkels.size || toestand.winkels.has(a.winkel)) &&
     (!toestand.oordeel || a.oordeel === toestand.oordeel) &&
+    (!toestand.kanaal || (toestand.kanaal === 'online') === !!a.online) &&
     (!termen.length || termen.every((t) => a._z.includes(t))));
   familieKeuze(basis);
   let l = toestand.familie ? basis.filter((a) => (a.familie || 'Overig') === toestand.familie) : basis;
