@@ -16,6 +16,9 @@ supermarkt, familie en oordeel. Stand: AH, Dirk, Jumbo, Aldi, Lidl en Boon's (we
 
 ## Openstaand
 
+- Online-multipacks (4164 AH-aanbiedingen, "4-pack", "volume voordeel") hebben geen prijs per kg/l en zijn "Geen vergelijking": eenheidsprijs uit het basisproduct afleiden of weglaten (`winkels/ah.mjs`, `maakProduct`).
+- Beslissen of een alleen-online product het alternatief van een winkelproduct mag zijn (nu wel, kaart zegt "alleen online"; `vergelijk.mjs`, `beoordeel`); zie `docs/besluiten/beste-en-online.md`.
+
 - Plus ontbreekt (bot-bescherming, alleen via browser); onderzoek in `docs/bronnen.md`.
 - Mobiele layout (390 px) niet op een echte telefoon bekeken; filterrij controleren op de Motorola.
 - Huismerklijsten Dirk (Silvo, Daily Chef, Bits & Bites, Derlon) en Aldi/Lidl deels onbevestigd.
