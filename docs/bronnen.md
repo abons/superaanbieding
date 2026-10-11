@@ -150,3 +150,19 @@ Twee routes, allebei plain fetch vanuit Node:
   `totalOffers: 0`, geen losse aanbiedingen voor de lopende week (losse offer-pagina's bestaan alleen voor oude folders, bv. 3-9 aug).
 - Geen API, geen webshop met prijzen. Alternatief: folderpagina's als afbeelding lezen (OCR/vision per week, foutgevoelig) of
   handmatig invoeren; niet in deze tool gedaan om geen nepdata te maken.
+
+### Boon's, tweede ronde (2026-10-11): ook via derden niets bruikbaars, nog steeds geen `winkels/boons.mjs`
+
+Gecontroleerd met gewone fetch (browser-UA, enkele requests per site), niets omzeild:
+- `foldervolgendeweek.nl/winkels/boon-s-markt/` en `/aanbiedingen/`: kent folder week 42 (12-18 okt), maar de folderpagina's hebben
+  geen producttekst; de enige tekstuele aanbiedingen (titel, prijs, normaalprijs, % korting) zijn van **26 jan-1 feb 2026**: verouderd.
+- `allefolders.nl/boon-s-markt/folder-aanbiedingen`: alleen week 41 (24 paginabeelden); losse `?offer=`-pagina's zijn hotspots op
+  afbeeldingen en `robots.txt` verbiedt `/*?offer=`: niet gebruikt.
+- `folderz.nl` (zie hierboven: `totalOffers: 0`), `promotiesfolders.nl` (alleen galerijafbeeldingen, geen prijzen als tekst),
+  `folderfeest.nl` en `1folders.nl` (alleen foldertegel/afbeelding, geen prijzen), `folders.nl/boons-markt` (lege shell).
+- `supermarktaanbiedingen.com` heeft geen Boon's (404); `aanbiedingen.nl` en `reclamefolder.nl` (DPG-consentmuur) geven geen data.
+- `boonsmarkt.nl`: robots.txt sluit alleen `/cpresources/`, `/vendor/` en `.env` uit, maar de site heeft geen prijzen; `dagmarkt.nl`
+  stuurt naar dezelfde site. Geen JSON/Next-data met aanbiedingen.
+Conclusie: de week-42-prijzen bestaan online alleen als folderafbeelding (DRM-FlippingBook of aggregator-afbeeldingen). Zou
+je het toch willen: vision/OCR op die afbeeldingen (de aggregator-afbeeldingen zijn derde partij, foutgevoelig, week 42 pas vanaf ma 12 okt).
+Geen nepdata geschreven.
