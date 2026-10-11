@@ -23,6 +23,7 @@ node test.mjs                  # tests of the verdict logic
   pre-compressed `.gz`).
 - Boon's has no machine-readable source: `invoer/boons-w<week>.json` is read from the folder by hand each week.
 - Reachable on 127.0.0.1 only. For a phone: `tailscale serve --bg --https=8445 8092` (never `funnel`).
+- Public copy: https://abons.github.io/superaanbieding/, rebuilt daily by `.github/workflows/publiceer.yml` (collectors + merge + GitHub Pages; `data/` kept in `actions/cache`). A push to `invoer/**` also triggers it.
 - Redraw the icons: `node pwa/maak-iconen.mjs`.
 
 ## Verdict
