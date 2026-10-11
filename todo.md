@@ -4,7 +4,7 @@ Doel: huidige supermarkt-aanbiedingen tonen, per aanbieding of het een goede dea
 goedkoper is per kg/liter. **Filter op supermarkt** (wens gebruiker, 2026-10-11).
 
 ## Besloten
-- Architectuur: pc-verzamelaar (Node, zoals `growatt`) -> één JSON -> pure-Kotlin app (framework only, geen libs).
+- Architectuur: pc-verzamelaar (Node, zoals `growatt`) -> één JSON -> PWA (geen Android-app; 2026-10-11).
 - Deal-oordeel: aanbiedingsprijs per kg/l vs. goedkoopste alternatief in dezelfde subcategorie (huismerk of merk).
 
 ## Onderzoek 2026-10-11
@@ -19,5 +19,5 @@ goedkoper is per kg/liter. **Filter op supermarkt** (wens gebruiker, 2026-10-11)
 - [ ] Verzamelaar AH: crawl subcategorieën, bewaar bonus + referentieprijzen per kg/l
 - [ ] Verzamelaar Dirk: veldnamen listOffers achterhalen
 - [ ] Jumbo/Plus/Aldi/Lidl: route kiezen (browser-scrape of folder)
-- [ ] Android-app (kopieer build-config van `wordfinder-src`), lijst + supermarkt-filter + deal-badge
-- [ ] Hosting JSON (GitHub Pages zoals wordguesser, of tailscale)
+- [ ] PWA (patroon van `growatt`: `serve.mjs` + `pagina.html` + `pwa/`), lijst + supermarkt-filter + deal-badge
+- [ ] Bereikbaar maken via `tailscale serve` (nooit funnel), zoals growatt

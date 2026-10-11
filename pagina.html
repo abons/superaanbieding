@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f7a4d">
+<title>Superaanbieding</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root {
+  --bg: #f4f6f3; --kaart: #ffffff; --tekst: #1b2420; --zacht: #5c6a63; --lijn: #dde4df;
+  --accent: #1f7a4d; --accent-tekst: #ffffff;
+  --goed: #137a3b; --goed-bg: #d9f2e2;
+  --huis: #8a5a00; --huis-bg: #fdebc4;
+  --merk: #a0361f; --merk-bg: #fbdcd5;
+  --onb: #55606a; --onb-bg: #e4e8ec;
+  --waarsch-bg: #fff3cd; --waarsch-tekst: #5c4400;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181a; --kaart: #1e2428; --tekst: #e8eeea; --zacht: #9aa8a0; --lijn: #313a3e;
+    --accent: #4cc38a; --accent-tekst: #0b1a12;
+    --goed: #6fe0a0; --goed-bg: #1a3a29;
+    --huis: #f3c25c; --huis-bg: #3c3014;
+    --merk: #ff9c85; --merk-bg: #45221a;
+    --onb: #b0bac3; --onb-bg: #2b3338;
+    --waarsch-bg: #3d3310; --waarsch-tekst: #f3dd8c;
+  }
+}
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+body { margin: 0; background: var(--bg); color: var(--tekst); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 0 16px 48px; }
+header { padding: 16px 0 8px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 1.5rem; }
+.sub { color: var(--zacht); font-size: .85rem; }
+.waarsch { background: var(--waarsch-bg); color: var(--waarsch-tekst); padding: 10px 12px; border-radius: 10px; margin: 8px 0; font-size: .9rem; white-space: pre-line; }
+.bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0 10px; border-bottom: 1px solid var(--lijn); }
+input[type=search], select { width: 100%; font: inherit; color: var(--tekst); background: var(--kaart); border: 1px solid var(--lijn); border-radius: 10px; padding: 10px 12px; }
+.rij { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rij.twee { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+button.chip { font: inherit; font-size: .9rem; color: var(--tekst); background: var(--kaart); border: 1px solid var(--lijn); border-radius: 999px; padding: 6px 12px; cursor: pointer; min-height: 36px; }
+button.chip[aria-pressed=true] { background: var(--accent); color: var(--accent-tekst); border-color: var(--accent); font-weight: 600; }
+button.chip small { opacity: .75; margin-left: 4px; }
+.aantal { color: var(--zacht); font-size: .85rem; margin: 10px 0 4px; }
+ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radius: 14px; padding: 12px; display: grid; grid-template-columns: 84px 1fr; gap: 12px; }
+.plaatje { width: 84px; height: 84px; border-radius: 10px; background: var(--onb-bg); display: grid; place-items: center; color: var(--zacht); font-weight: 700; font-size: 1.6rem; overflow: hidden; }
+.plaatje img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.titel { font-weight: 600; overflow-wrap: anywhere; }
+.meta { color: var(--zacht); font-size: .85rem; }
+.prijzen { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; }
+.prijs { font-size: 1.25rem; font-weight: 700; }
+.oud { color: var(--zacht); text-decoration: line-through; font-size: .9rem; }
+.eenh { color: var(--zacht); font-size: .85rem; }
+.badge { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 999px; font-size: .85rem; font-weight: 700; }
+.badge.goed { background: var(--goed-bg); color: var(--goed); }
+.badge.huismerk-goedkoper { background: var(--huis-bg); color: var(--huis); }
+.badge.merk-goedkoper { background: var(--merk-bg); color: var(--merk); }
+.badge.onbekend { background: var(--onb-bg); color: var(--onb); }
+.alt { font-size: .85rem; margin-top: 4px; overflow-wrap: anywhere; }
+.leeg { text-align: center; color: var(--zacht); padding: 32px 0; }
+@media (min-width: 560px) { .rij.twee { grid-template-columns: 2fr 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Superaanbieding</h1>
+    <span class="sub" id="gemaakt"></span>
+  </header>
+  <div id="offline" class="waarsch" hidden>De pc is niet bereikbaar: dit is de laatst opgeslagen stand.</div>
+  <div id="fout" class="waarsch" hidden></div>
+  <div class="bar">
+    <input type="search" id="zoek" placeholder="Zoek op product of merk" aria-label="Zoeken" autocomplete="off">
+    <div class="rij" id="winkels" role="group" aria-label="Supermarkt"></div>
+    <div class="rij" id="oordelen" role="group" aria-label="Oordeel"></div>
+    <div class="rij twee"><select id="sorteer" aria-label="Sorteren">
+      <option value="besparing">Sorteer: grootste besparing</option>
+      <option value="prijs">Sorteer: laagste prijs per kg/l</option>
+    </select></div>
+  </div>
+  <div class="aantal" id="aantal"></div>
+  <ul id="lijst"></ul>
+</main>
+<script>
+'use strict';
+const DATA = __DATA__;
+const GEMAAKT = '__GEMAAKT__';
+const FOUT = __FOUT__;
+
+const OORDELEN = [['', 'Alles'], ['goed', 'Goede deal'], ['huismerk-goedkoper', 'Huismerk goedkoper'], ['merk-goedkoper', 'Merk goedkoper'], ['onbekend', 'Onbekend']];
+const BADGE = { 'goed': 'Goede deal', 'huismerk-goedkoper': 'Huismerk goedkoper', 'merk-goedkoper': 'Merk goedkoper', 'onbekend': 'Niet te vergelijken' };
+const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
+const EENHEID = { kg: 'kg', l: 'l', stuk: 'stuk' };
+
+const opslag = {
+  lees(k, d) { try { const v = localStorage.getItem('sa-' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  schrijf(k, v) { try { localStorage.setItem('sa-' + k, JSON.stringify(v)); } catch {} },
+};
+const winkelNamen = new Map((DATA.winkels || []).map((w) => [w.id, w.naam]));
+const toestand = {
+  winkels: new Set(opslag.lees('winkels', []).filter((id) => winkelNamen.has(id))), // leeg = alle
+  oordeel: opslag.lees('oordeel', ''),
+  sorteer: opslag.lees('sorteer', 'besparing'),
+  zoek: '',
+};
+if (!OORDELEN.some(([k]) => k === toestand.oordeel)) toestand.oordeel = '';
+if (!['besparing', 'prijs'].includes(toestand.sorteer)) toestand.sorteer = 'besparing';
+
+const el = (naam, attr = {}, tekst) => {
+  const e = document.createElement(naam);
+  for (const [k, v] of Object.entries(attr)) e.setAttribute(k, v);
+  if (tekst !== undefined) e.textContent = tekst;
+  return e;
+};
+const $ = (id) => document.getElementById(id);
+const perEenheid = (n, e) => `${euro.format(n)} / ${EENHEID[e] || e || '?'}`;
+const norm = (s) => String(s || '').toLowerCase();
+const datum = (s) => { const d = new Date(s + 'T00:00:00'); return isNaN(d) ? s : d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }); };
+
+function chips() {
+  const w = $('winkels'); w.replaceChildren();
+  const tel = new Map();
+  for (const a of DATA.aanbiedingen) tel.set(a.winkel, (tel.get(a.winkel) || 0) + 1);
+  for (const [id, naam] of winkelNamen) {
+    const b = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(toestand.winkels.has(id)) }, naam);
+    b.append(el('small', {}, String(tel.get(id) || 0)));
+    b.onclick = () => {
+      toestand.winkels.has(id) ? toestand.winkels.delete(id) : toestand.winkels.add(id);
+      opslag.schrijf('winkels', [...toestand.winkels]); chips(); teken();
+    };
+    w.append(b);
+  }
+  const o = $('oordelen'); o.replaceChildren();
+  for (const [k, naam] of OORDELEN) {
+    const b = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(toestand.oordeel === k) }, naam);
+    b.onclick = () => { toestand.oordeel = k; opslag.schrijf('oordeel', k); chips(); teken(); };
+    o.append(b);
+  }
+}
+
+function kaart(a) {
+  const li = el('li', { class: 'kaart' });
+  const plaatje = el('div', { class: 'plaatje' });
+  if (typeof a.afbeelding === 'string' && a.afbeelding.startsWith('https://')) {
+    const img = el('img', { src: a.afbeelding, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' });
+    img.onerror = () => { plaatje.replaceChildren((a.titel || '?').trim().charAt(0).toUpperCase()); };
+    plaatje.append(img);
+  } else plaatje.textContent = (a.titel || '?').trim().charAt(0).toUpperCase();
+  const t = el('div');
+  t.append(el('div', { class: 'titel' }, a.titel));
+  t.append(el('div', { class: 'meta' }, [winkelNamen.get(a.winkel) || a.winkel, a.merk, a.inhoud].filter(Boolean).join(' · ')));
+  const p = el('div', { class: 'prijzen' });
+  p.append(el('span', { class: 'prijs' }, euro.format(a.prijs)));
+  if (a.normaalPrijs && a.normaalPrijs > a.prijs) p.append(el('span', { class: 'oud' }, euro.format(a.normaalPrijs)));
+  if (a.prijsPerEenheid) p.append(el('span', { class: 'eenh' }, perEenheid(a.prijsPerEenheid, a.eenheid)));
+  t.append(p);
+  const extra = [a.mechanisme, a.geldigTot ? 't/m ' + datum(a.geldigTot) : ''].filter(Boolean).join(' · ');
+  if (extra) t.append(el('div', { class: 'meta' }, extra));
+  t.append(el('span', { class: 'badge ' + a.oordeel }, BADGE[a.oordeel] || a.oordeel));
+  const alt = a.alternatief;
+  if (alt) {
+    const soort = alt.huismerk ? 'huismerk' : 'merk';
+    const waar = alt.winkel !== a.winkel ? ' bij ' + (winkelNamen.get(alt.winkel) || alt.winkel) : '';
+    t.append(el('div', { class: 'alt' },
+      `Goedkoper: ${alt.titel} (${soort}${waar}) ${perEenheid(alt.prijsPerEenheid, alt.eenheid || a.eenheid)}` +
+      ` – bespaar ${euro.format(a.besparing)} per ${EENHEID[a.eenheid] || a.eenheid}`));
+  }
+  li.append(plaatje, t);
+  return li;
+}
+
+function teken() {
+  const q = norm(toestand.zoek).trim();
+  let l = DATA.aanbiedingen.filter((a) =>
+    (!toestand.winkels.size || toestand.winkels.has(a.winkel)) &&
+    (!toestand.oordeel || a.oordeel === toestand.oordeel) &&
+    (!q || norm(a.titel + ' ' + (a.merk || '') + ' ' + (a.categorie || '')).includes(q)));
+  if (toestand.sorteer === 'prijs') {
+    l.sort((x, y) => (x.prijsPerEenheid ?? Infinity) - (y.prijsPerEenheid ?? Infinity) || x.titel.localeCompare(y.titel, 'nl'));
+  } else {
+    l.sort((x, y) => y.besparing - x.besparing || (x.oordeel === 'goed' ? -1 : 0) - (y.oordeel === 'goed' ? -1 : 0) || x.titel.localeCompare(y.titel, 'nl'));
+  }
+  $('aantal').textContent = `${l.length} van ${DATA.aanbiedingen.length} aanbiedingen`;
+  const ul = $('lijst'); ul.replaceChildren();
+  if (!l.length) ul.append(el('li', { class: 'leeg' }, DATA.aanbiedingen.length ? 'Niets gevonden met deze filters.' : 'Nog geen aanbiedingen beschikbaar.'));
+  for (const a of l) ul.append(kaart(a));
+}
+
+$('gemaakt').textContent = 'bijgewerkt ' + new Date(GEMAAKT).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+if (FOUT) { $('fout').textContent = FOUT; $('fout').hidden = false; }
+$('sorteer').value = toestand.sorteer;
+$('sorteer').onchange = (e) => { toestand.sorteer = e.target.value; opslag.schrijf('sorteer', toestand.sorteer); teken(); };
+$('zoek').oninput = (e) => { toestand.zoek = e.target.value; teken(); };
+chips(); teken();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // De service worker zet X-Uit-Cache op een antwoord uit de cache: de pc was dan niet bereikbaar.
+  fetch(location.pathname).then((r) => { if (r.headers.get('X-Uit-Cache')) $('offline').hidden = false; }).catch(() => {});
+}
+</script>
+</body>
+</html>
