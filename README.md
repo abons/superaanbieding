@@ -1,28 +1,34 @@
 # Superaanbieding
 
-Lokale tool (Node 22, geen dependencies) die supermarktaanbiedingen verzamelt en per aanbieding zegt of het een
-goede deal is, of dat een huismerk of ander merk goedkoper is per kg of liter. Nederlandse pagina, installeerbaar als PWA.
+Local tool (Node 22, no dependencies) that collects Dutch supermarket offers and says, per offer, whether it is a good
+deal or whether a house brand or another brand is cheaper per kg or litre. Dutch UI, installable as a PWA.
 
-## Gebruik
+Stores: Albert Heijn, Dirk, Jumbo, Aldi, Lidl, and Boon's Markt (hand-read weekly folder). Plus is not covered yet.
+
+## Usage
 
 ```
-node serve.mjs              # pagina op http://127.0.0.1:8092, ververst elk uur
-node serve.mjs --fixtures   # zelfde, maar met testdata uit fixtures/ (geen verzamelaars)
-node serve.mjs --geen-ophalen  # echte data uit data/, verzamelaars niet draaien
-node vergelijk.mjs          # alleen samenvoegen: data/*.json -> data/aanbiedingen.json + build/
+node serve.mjs                 # page on http://127.0.0.1:8092, refreshes hourly
+node serve.mjs --fixtures      # same, with test data from fixtures/ (collectors do not run)
+node serve.mjs --geen-ophalen  # real data from data/, collectors do not run
+node vergelijk.mjs             # merge only: data/*.json -> data/aanbiedingen.json + build/
 node vergelijk.mjs --fixtures
-node test.mjs               # test de oordeelslogica
+node test.mjs                  # tests of the verdict logic
 ```
 
-- `winkels/<winkel>.mjs` haalt de aanbiedingen van een winkel op en schrijft `data/<winkel>.json`
-  (formaat: `docs/contract.md`). `serve.mjs` draait ze één voor één; een winkel die faalt breekt de rest niet.
-  Fouten staan in `data/laatste-fout.txt` en als waarschuwing op de pagina.
-- `vergelijk.mjs` past de oordeelsregel toe en bouwt `build/` (kleine pagina, compacte `aanbiedingen.json`, PWA-bestanden, plus vooraf gecomprimeerde `.gz`).
-- Alleen bereikbaar op 127.0.0.1. Voor de telefoon: `tailscale serve --bg --https=8445 8092` (nooit `funnel`).
-- Iconen opnieuw tekenen: `node pwa/maak-iconen.mjs`.
+- `winkels/<store>.mjs` fetches a store's offers and writes `data/<store>.json` (format: `docs/contract.md`).
+  `serve.mjs` runs them one by one; a failing store does not break the rest. Errors go to `data/laatste-fout.txt`
+  and show as a warning on the page.
+- `vergelijk.mjs` applies the verdict rule and builds `build/` (small page, compact `aanbiedingen.json`, PWA files,
+  pre-compressed `.gz`).
+- Boon's has no machine-readable source: `invoer/boons-w<week>.json` is read from the folder by hand each week.
+- Reachable on 127.0.0.1 only. For a phone: `tailscale serve --bg --https=8445 8092` (never `funnel`).
+- Redraw the icons: `node pwa/maak-iconen.mjs`.
 
-## Oordeel
+## Verdict
 
-Een aanbieding wordt vergeleken met het goedkoopste product (referentie of andere aanbieding, ook bij een andere winkel)
-in dezelfde categorie en eenheid, op prijs per kg/l. Binnen 5% van het goedkoopste is een goede deal; anders staat er
-of het alternatief een huismerk of een merk is, met de besparing per kg/l. Zonder eenheidsprijs of vergelijkbaar product: onbekend.
+An offer is compared per kg/l (or per piece where that makes sense) with the cheapest product (reference or other
+offer, any store) in the same narrow category, falling back to a broad product family (bread, cheese, ...). Within 5% of
+the cheapest is a good deal; otherwise the cheaper alternative is shown, marked house brand or brand, with the saving.
+"Good" needs a real comparison (at least three candidates, one from another store or brand); without one the verdict is
+"no good comparison".

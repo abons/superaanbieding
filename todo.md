@@ -1,23 +1,23 @@
 # todo — superaanbieding
 
-Doel: huidige supermarkt-aanbiedingen tonen, per aanbieding of het een goede deal is of dat huismerk/merk
-goedkoper is per kg/liter. **Filter op supermarkt** (wens gebruiker, 2026-10-11).
+Doel: huidige supermarkt-aanbiedingen tonen met oordeel (goede deal / huismerk of merk goedkoper per kg/l), filter op
+supermarkt, familie en oordeel. Stand: AH, Dirk, Jumbo, Aldi, Lidl en Boon's (week 42) werken; PWA op :8092, tailscale :8445.
 
-## Besloten
-- Architectuur: pc-verzamelaar (Node, zoals `growatt`) -> één JSON -> PWA (geen Android-app; 2026-10-11).
-- Deal-oordeel: aanbiedingsprijs per kg/l vs. goedkoopste alternatief in dezelfde subcategorie (huismerk of merk).
+## Hier begint de volgende sessie
 
-## Onderzoek 2026-10-11
-- AH werkt zonder login: token via `POST api.ah.nl/mobile-auth/v1/auth/token/anonymous` (clientId `appie`, header
-  `X-Application: AHWEBSHOP`), daarna `mobile-services/product/search/v2?query=..&size=..&page=..`. Geeft
-  `unitPriceDescription` ("prijs per liter €2.42"), `isBonus`, `brand`, `subCategory`. Een `filters=` param geeft 500;
-  bonus-endpoint `bonuspage/v2/section` geeft 400 -> aanbiedingen eruit filteren op `isBonus` via categorie-crawl.
-- Dirk: `web-gateway.dirk.nl/graphql` open, introspectie uit; `listOffers` bestaat, velden nog onbekend.
-- Jumbo (`mobileapi.jumbo.com`), Plus en `ah.nl/gql`: 403 Access Denied (bot-bescherming).
+1. Hoge besparingen die blijven staan (vanillestokje 1000/kg, diffuser 220/l, bieslook 208): categorie/familie te breed, geen drempelprobleem;
+   `MIN_VERHOUDING` in `vergelijk.mjs` is 0,2. Smaller indelen in `familie.mjs` of een bovengrens op besparing overwegen.
+2. Automatisch verversen: server start nu handmatig (`node serve.mjs --geen-ophalen`) en draait niet mee na een pc-herstart;
+   regel in `Vocal/scripts/diensten.ps1` (rij "Superaanbieding", poort 8092, https :8445) en dagelijkse echte run van de verzamelaars.
+3. Boon's week 43 (en elke week): folder https://online.flippingbook.com/view/572493953/ lezen naar `invoer/boons-w43.json`;
+   week 42 verloopt 2026-10-18.
+4. AH `100 GRAM VOOR 2.99` herkennen: `winkels/ah.mjs:98` geeft prijs 2.99 en 11,5 EUR/kg voor een kogelbiefstuk (ca. 260 g,
+   2 items) die echt 29,9 EUR/kg is.
 
-## Open
-- [ ] Verzamelaar AH: crawl subcategorieën, bewaar bonus + referentieprijzen per kg/l
-- [ ] Verzamelaar Dirk: veldnamen listOffers achterhalen
-- [ ] Jumbo/Plus/Aldi/Lidl: route kiezen (browser-scrape of folder)
-- [ ] PWA (patroon van `growatt`: `serve.mjs` + `pagina.html` + `pwa/`), lijst + supermarkt-filter + deal-badge
-- [ ] Bereikbaar maken via `tailscale serve` (nooit funnel), zoals growatt
+## Openstaand
+
+- Plus ontbreekt (bot-bescherming, alleen via browser); onderzoek in `docs/bronnen.md`.
+- Mobiele layout (390 px) niet op een echte telefoon bekeken; filterrij controleren op de Motorola.
+- Huismerklijsten Dirk (Silvo, Daily Chef, Bits & Bites, Derlon) en Aldi/Lidl deels onbevestigd.
+- Families te grof (kip, kaas, sauzen, toetjes): alternatief kan goedkoper maar niet gelijkwaardig zijn.
+- Brood per stuk tegenover per kg (Dirk Polders): geen gewicht per brood in de data.

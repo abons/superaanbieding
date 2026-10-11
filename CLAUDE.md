@@ -23,7 +23,7 @@ See `README.md` for use, `docs/contract.md` for the data format (the contract be
   together. Same `eenheid`; narrow `categorie` first, the `familie` when the category has < 3 comparable products or none from another shop/brand; `goed` only with a real comparison (>= 3, one other shop/brand) within 5% of cheapest, else `onbekend`.
 - ⚠️ **A failing collector must never break the others or the merge**: `serve.mjs` spawns each as its own process,
   writes `data/laatste-fout.txt`, and the page shows it as a warning. Missing or corrupt `data/<winkel>.json` is skipped with a warning.
-- `data/` and `build/` are gitignored (generated). `build/index.html` is small (13 KB); the data is `build/aanbiedingen.json` (compact form, see contract), both cached by `sw.js`.
+- `data/` and `build/` are gitignored (generated). `build/index.html` is a small static page; the data is `build/aanbiedingen.json` (compact form, see contract), both cached by `sw.js`.
 - `aanbiedingen.json` in `data/` is the merger's output and is never read back as a shop file.
 - Port 8092 is a table row elsewhere too (growatt is 8090); do not reuse it for something else.
 - Windows PowerShell 5.1 corrupts files on a Get-/Set-Content round trip: edit with the editor tools. Heredocs with
