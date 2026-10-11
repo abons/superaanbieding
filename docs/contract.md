@@ -40,7 +40,7 @@ Product:
 | `online` | boolean, optioneel | alleen in de webshop te krijgen (AH Online-actie, Jumbo "alleen online"); ontbreekt = ook in de winkel. De pagina heeft er een filter voor; een online product mag als `alternatief` dienen, en de kaart zet dan "alleen online" erbij; bij een winkelaanbieding pas als er geen goedkoper winkelalternatief is |
 
 `vergelijk.mjs` controleert dit bij het inlezen (`valideerProducten`) en geeft per winkel een waarschuwing (niets wordt uitgesloten of
-aangepast): `geldigTot` dat niet de vorm `jjjj-mm-dd` heeft (de verloopcontrole slaat zo'n aanbieding over, dus hij telt als niet verlopen; `pagina.html` doet hetzelfde), en aanbiedingen zonder `titel` of met
+aangepast): `geldigTot` dat niet de vorm `jjjj-mm-dd` heeft (de verloopcontrole vergelijkt alleen de eerste tien tekens als die op `jjjj-mm-dd` beginnen, zodat datum+tijd werkt maar ook de melding geeft; bij een ander formaat telt hij als niet verlopen; een onmogelijke datum als 2026-02-30 wordt niet herkend; `pagina.html` doet hetzelfde), en aanbiedingen zonder `titel` of met
 een `prijs` die geen getal > 0 is (die worden genegeerd).
 
 Geef `prijsPerEenheid` zelf door als de winkel hem levert; zo niet, reken hem uit de inhoud. Bij meervoudsaanbiedingen

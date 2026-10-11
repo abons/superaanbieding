@@ -149,7 +149,7 @@ export function leesWinkels(dir, controleerLeeftijd = true) {
       winkels.push({ winkel: id, naam: j.naam ?? id, gemaakt: j.gemaakt ?? null, aanbiedingen: ne.uit, referentie: nr.uit });
       if (ne.onbekend + nr.onbekend) waarschuwingen.push(`${j.naam ?? id}: ${ne.onbekend + nr.onbekend} producten met een onbekende eenheid (alleen kg, l, stuk of leeg), zonder vergelijking`);
       const va = valideerProducten(ne.uit, true), vr = valideerProducten(nr.uit, false);
-      if (va.datum + vr.datum) waarschuwingen.push(`${j.naam ?? id}: ${va.datum + vr.datum} producten met een geldigTot in een ander formaat dan jjjj-mm-dd (de verloopcontrole slaat ze over)`);
+      if (va.datum + vr.datum) waarschuwingen.push(`${j.naam ?? id}: ${va.datum + vr.datum} producten met een geldigTot in een ander formaat dan jjjj-mm-dd (de verloopcontrole vergelijkt alleen de eerste tien tekens als die jjjj-mm-dd zijn, anders slaat ze het over)`);
       if (va.kaal + vr.kaal) waarschuwingen.push(`${j.naam ?? id}: ${va.kaal + vr.kaal} producten zonder titel of met een prijs die geen getal > 0 is (genegeerd)`);
       if (typeof j.waarschuwing === 'string' && j.waarschuwing) waarschuwingen.push(`${j.naam ?? id}: ${j.waarschuwing}`);
       const leeftijd = j.gemaakt ? Date.now() - Date.parse(j.gemaakt) : NaN;
