@@ -1,0 +1,20 @@
+name: test-collectors
+on: workflow_dispatch
+jobs:
+  collectors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: collectors
+        run: |
+          mkdir -p data
+          for w in ah aldi boons dirk jumbo lidl; do
+            echo "::group::$w"
+            node winkels/$w.mjs && echo "RESULT $w OK" || echo "RESULT $w FAIL"
+            echo "::endgroup::"
+          done
+          ls -la data
+      - name: merge
+        run: node vergelijk.mjs && ls -la build
