@@ -5,8 +5,7 @@ supermarkt, familie en oordeel. Stand: AH, Dirk, Jumbo, Aldi, Lidl en Boon's (we
 
 ## Hier begint de volgende sessie
 
-1. `Vocal/scripts/diensten.ps1` heeft sinds 2026-10-11 de rij "Superaanbieding" (8092, :8445, start zonder `--geen-ophalen`: echte run bij start, daarna samenvoegen elk uur en verzamelaars hoogstens elke 6 uur); nog niet gedraaid (Vocal-commit 2853cb7); sinds de Pages-route (2026-10-11) misschien overbodig: eerst beslissen of de lokale tool nog nodig is. Controleren na `diensten.ps1 -Actie herstart` en de bestaande taak bij inloggen (die roept `herstart` aan). `scripts/status-widget.ps1` heeft geen rij voor Superaanbieding (bewust?); `Stop-Alles` herkent 8092 aan `serve\.mjs`, net als growatt.
-2. Boon's week 43 (en elke week), doen vanaf donderdag 2026-10-15 (een nieuwe folder verschijnt ongeveer donderdag voor de nieuwe week; W43 bestond op 2026-10-11 nog niet; nooit data verzinnen): nieuwe folder
+1. Boon's week 43 (en elke week), doen vanaf donderdag 2026-10-15 (een nieuwe folder verschijnt ongeveer donderdag voor de nieuwe week; W43 bestond op 2026-10-11 nog niet; nooit data verzinnen): nieuwe folder
    zoeken via `boonsmarkt.nl/folder` (locatie 26839); de FlippingBook-link `.../view/572493953/` is de **W42**-folder, W43 krijgt een andere id.
    Pagina's lezen naar `invoer/boons-w43.json` (formaat in kop van `winkels/boons.mjs`, voorbeeld `invoer/boons-w42.json`, geldigVan 2026-10-19,
    geldigTot 2026-10-25). `kiesInvoer` kiest sinds 2026-10-11 geen week met `geldigVan` in de toekomst, dus W43 mag vooraf klaar staan. Week 42 verloopt 2026-10-18; daarna toont de tool geen Boon's meer tot de nieuwe invoer er is.
