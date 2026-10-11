@@ -198,7 +198,7 @@ function teken() {
   // Eerst alles behalve de familie; daar tellen we de families uit, zodat de aantallen bij de andere filters passen.
   const basis = DATA.aanbiedingen.filter((a) =>
     (!toestand.winkels.size || toestand.winkels.has(a.winkel)) &&
-    (!toestand.oordeel || a.oordeel === toestand.oordeel) &&
+    (!toestand.oordeel || a.oordeel === toestand.oordeel || (toestand.oordeel === 'goed' && a.oordeel === 'beste')) && // Goede deal omvat ook Beste deal
     (!toestand.kanaal || (toestand.kanaal === 'online') === !!a.online) &&
     (!termen.length || termen.every((t) => a._z.includes(t))));
   familieKeuze(basis);
