@@ -69,8 +69,9 @@ Regel (`beoordeel` in `vergelijk.mjs`, families in `familie.mjs`): vergelijk `pr
    goedkoopste (de pagina sorteert `beste` boven `goed`); anders `huismerk-goedkoper` als het goedkoopste
    een huismerk is, anders `merk-goedkoper` (met `alternatief` en `besparing` = euro per kg/l verschil). `onbekend` (pagina: 'Geen goede
    vergelijking', `vergelijking: null`) zonder eenheidsprijs of zonder genoeg vergelijking; `beste` en `goed` hebben nooit een alternatief.
-4. Eenheid `stuk` wordt alleen vergeleken in families waar dat zinvol is (brood, broodjes, eieren, groente, fruit); een half brood is een
-   eigen familie. Verder gaat het om gewichtprijs (kg/l); per stuk zonder zinvolle familie is `onbekend`.
+4. Eenheid `stuk` wordt alleen vergeleken waar dat zinvol is: over de hele familie bij brood, broodjes en eieren, en bij groente en fruit
+   alleen binnen dezelfde winkelcategorie (ananas is geen banaan); een half brood is een eigen familie.
+   `eenheid` wordt bij het inlezen rechtgezet (KG, ltr, liter, stuks); elke andere waarde wordt `null` met een waarschuwing. Verder gaat het om gewichtprijs (kg/l); per stuk zonder zinvolle familie is `onbekend`.
 
 `familie` (nette naam, bv. "Brood", "Overig") en `vergelijking` staan in de volledige vorm; `familie` ook in de compacte vorm.
 

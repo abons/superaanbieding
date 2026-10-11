@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beoordeel, inkort, leesWinkels, pakLock, LOCK_STALE_MS, MIN_VERHOUDING, MIN_VERHOUDING_FAMILIE } from './vergelijk.mjs';
+import { beoordeel, inkort, leesWinkels, pakLock, LOCK_STALE_MS, MIN_VERHOUDING, MIN_VERHOUDING_FAMILIE, normEenheid } from './vergelijk.mjs';
 import { kiesInvoer } from './winkels/boons.mjs';
 import { isGratisCadeauZonderKorting } from './winkels/jumbo.mjs';
 import { familieVan, familieNaam } from './familie.mjs';
@@ -206,6 +206,26 @@ assert.equal(a.oordeel, 'onbekend'); assert.equal(a.vergelijking, null);
 assert.equal(een([w('ah', [p()], refs(2, 3))]).oordeel, 'onbekend');
 assert.equal(een([w('ah', [p({ prijsPerEenheid: 100 })], refs(1, 50, 60))]).oordeel, 'onbekend');
 assert.equal(een([w('ah', [p({ prijsPerEenheid: 100 })], refs(30, 50, 60))]).oordeel, 'merk-goedkoper');
+
+// Per stuk: brood vergelijkt over de familie (zie de brood-case), groente en fruit alleen binnen dezelfde categorie.
+{
+  const fruit = (id, cat, titel, pr, o = {}) => stuk({ id, categorie: cat, titel, merk: 'X', prijsPerEenheid: pr, prijs: pr, ...o });
+  const bananen = [fruit('b1', 'Bananen', 'Bananen los', 0.4), fruit('b2', 'Bananen', 'Bananen bio', 0.45), fruit('b3', 'Bananen', 'Bananen fair', 0.5)];
+  assert.equal(een([w('ah', [fruit('x', 'Ananas', 'Ananas', 2)], bananen)]).oordeel, 'onbekend'); // ananas vs bananen: andere categorie
+  a = een([w('ah', [fruit('x', 'Bananen', 'Bananen kleine tros', 0.8, { merk: 'Chiquita' })], bananen)]);
+  assert.equal(a.oordeel, 'merk-goedkoper'); assert.equal(a.vergelijking, 'categorie'); // dezelfde categorie telt wel
+}
+
+// Eenheid: spelling wordt rechtgezet (KG, ltr, Stuks), al het andere wordt null met een waarschuwing.
+assert.deepEqual(['KG', ' kg ', 'ltr', 'Liter', 'l', 'Stuks', 'stuk', 'g', 'ml', '', 5, null].map(normEenheid), ['kg', 'kg', 'l', 'l', 'l', 'stuk', 'stuk', null, null, null, null, null]);
+{
+  const t3 = mkdtempSync(join(tmpdir(), 'sa-test3-'));
+  writeFileSync(join(t3, 'x.json'), JSON.stringify({ winkel: 'x', naam: 'x', gemaakt: new Date().toISOString(), aanbiedingen: [p({ id: '1', eenheid: 'KG' }), p({ id: '2', eenheid: 'ml' })], referentie: [p({ id: '3', eenheid: 'ltr' })] }));
+  const r = leesWinkels(t3);
+  assert.deepEqual(r.winkels[0].aanbiedingen.map((x) => x.eenheid), ['kg', null]); assert.equal(r.winkels[0].referentie[0].eenheid, 'l');
+  assert.ok(r.waarschuwingen.some((x) => x.includes('1 producten met een onbekende eenheid')));
+  rmSync(t3, { recursive: true, force: true });
+}
 
 // Product zonder id sluit de rest van zijn winkel niet uit als kandidaat (objectidentiteit in plaats van undefined === undefined).
 {

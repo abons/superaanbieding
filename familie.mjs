@@ -121,8 +121,10 @@ export const GEEN_VERGELIJKING = new Set(['non-food', 'lichaamsverzorging', 'hui
 const strip = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
 export const FAMILIES = [...new Set(REGELS.map((r) => r[0]))].filter((f) => !GEEN_VERGELIJKING.has(f));
-// Families waarvoor "per stuk" zinvol vergelijkbaar is (een brood is een brood, een ei is een ei).
-export const STUK_FAMILIES = new Set(['brood', 'broodjes', 'eieren', 'groente', 'fruit']);
+// Families waarvoor "per stuk" over de hele familie zinvol vergelijkbaar is (een brood is een brood, een ei is een ei).
+export const STUK_FAMILIES = new Set(['brood', 'broodjes', 'eieren']);
+// Families waar "per stuk" alleen binnen dezelfde winkelcategorie telt: ananas is geen banaan, avocado geen paprika.
+export const STUK_CATEGORIE_FAMILIES = new Set(['groente', 'fruit']);
 
 const cache = new Map();
 // -> familienaam of null (grabbelbakken en onduidelijke categorieen krijgen geen familie)

@@ -1,5 +1,7 @@
 # Bronnen per winkel (onderzoek 2026-10-11)
 
+Stand 2026-10-11: dit is onderzoek; de verzamelaars die erop draaien staan in `winkels/`.
+
 Alles hieronder is met een handvol requests per winkel getest. Browser-achtige `User-Agent` (Chrome 130 op Windows)
 en `Accept-Language: nl-NL` volstaan overal waar curl werkt; gebruik `--compressed`/`Accept-Encoding: gzip` en volg
 redirects (Jumbo stuurt `/aanbiedingen` door naar `/aanbiedingen/nu`; zonder redirect-volgen krijg je een bytes-rommel van 108 B).

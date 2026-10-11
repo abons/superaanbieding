@@ -186,7 +186,7 @@ async function haalBonus(params, eigenId) {
     const a = await zoek({ size: '1000', page: String(page), filters: 'bonus=Bonus', ...params });
     if (page === 0) kinderen = leesFacet(a, eigenId);
     for (const p of a.products || []) if (p.isBonus) bonusProducten.set(p.webshopId, p);
-    if (page + 1 >= a.page.totalPages || (a.products || []).length < 1000) break;
+    if (page + 1 >= (a.page?.totalPages ?? 1) || (a.products || []).length < 1000) break;
   }
   return kinderen;
 }
@@ -211,7 +211,7 @@ async function haalReferentie(naam, id) {
     for (let page = 0; page < 2; page++) {
       const a = await zoek({ size: "1000", page: String(page), taxonomyId: String(id) });
       neem(a);
-      if (page + 1 >= a.page.totalPages) break;
+      if (page + 1 >= (a.page?.totalPages ?? 1)) break;
     }
   } else {
     neem(await zoek({ size: "250", query: naam })); // categorie zonder bekend id: zoek op de naam

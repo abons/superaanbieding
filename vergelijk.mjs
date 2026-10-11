@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, exis
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { familieVan, familieNaam, STUK_FAMILIES } from './familie.mjs';
+import { familieVan, familieNaam, STUK_FAMILIES, STUK_CATEGORIE_FAMILIES } from './familie.mjs';
 
 export const DREMPEL = 0.05; // binnen 5% van het goedkoopste = goed
 export const MIN_KANDIDATEN = 3; // zo veel vergelijkbare producten (zonder de aanbieding zelf) nodig voor een echte vergelijking
@@ -30,6 +30,7 @@ export const vandaagNL = () => new Date().toLocaleDateString('sv', { timeZone: '
 const verlopen = (p, vandaag) => typeof p.geldigTot === 'string' && p.geldigTot < vandaag;
 const geenKorting = (p) => geldig(p.normaalPrijs) && p.prijs >= p.normaalPrijs;
 const sleutel = (p) => `${String(p.categorie ?? '').trim().toLowerCase()}|${p.eenheid}`;
+const stukCategorie = (fam) => !!fam && (STUK_FAMILIES.has(fam) || STUK_CATEGORIE_FAMILIES.has(fam));
 const rond = (n) => Math.round(n * 100) / 100;
 // Merk als vergelijkingssleutel: alle huismerken van een winkel (AH, AH Biologisch, AH Liefde & Passie, ...) zijn een merk.
 const merkVan = (c, winkel) => (c.huismerk ? 'huismerk:' + winkel : c.merk ? String(c.merk).trim().toLowerCase() : '');
@@ -50,7 +51,7 @@ function genoeg(p, winkel, lijst) {
 // winkels: [{winkel, naam, aanbiedingen:[], referentie:[]}] -> aanbiedingen met winkel, oordeel, alternatief, besparing,
 // familie en vergelijking ('categorie' | 'familie' | null = geen goede vergelijking).
 // Vergelijkt eerst binnen de (smalle) winkelcategorie, en valt anders terug op de grove productfamilie (familie.mjs),
-// altijd op dezelfde eenheid. 'stuk' wordt alleen vergeleken binnen families waar dat zinvol is (STUK_FAMILIES).
+// altijd op dezelfde eenheid. 'stuk' wordt alleen vergeleken waar dat zinvol is: over de hele familie voor STUK_FAMILIES, alleen binnen dezelfde categorie voor STUK_CATEGORIE_FAMILIES.
 export function beoordeel(winkels, vandaag = vandaagNL()) {
   const perCat = new Map(); // categorie|eenheid -> kandidaten, goedkoopste eerst
   const perFam = new Map(); // familie|eenheid -> kandidaten, goedkoopste eerst
@@ -64,7 +65,7 @@ export function beoordeel(winkels, vandaag = vandaagNL()) {
         if (!p.categorie && !fam) continue;
         const c = { winkel: w.winkel, id: p.id, titel: p.titel, merk: p.merk ?? null, huismerk: !!p.huismerk, online: !!p.online,
           prijsPerEenheid: p.prijsPerEenheid, eenheid: p.eenheid, aanbieding, [BRON]: p };
-        if (!isOverig(p.categorie) && (p.eenheid !== 'stuk' || (fam && STUK_FAMILIES.has(fam)))) voeg(perCat, sleutel(p), c);
+        if (!isOverig(p.categorie) && (p.eenheid !== 'stuk' || stukCategorie(fam))) voeg(perCat, sleutel(p), c);
         if (fam && (p.eenheid !== 'stuk' || STUK_FAMILIES.has(fam))) voeg(perFam, fam + '|' + p.eenheid, c);
       }
     }
@@ -79,7 +80,7 @@ export function beoordeel(winkels, vandaag = vandaagNL()) {
       if (!p || typeof p.titel !== 'string' || !geldig(p.prijs) || verlopen(p, vandaag) || geenKorting(p)) continue;
       const fam = familieVan(p);
       const basis = { ...p, winkel: w.winkel, oordeel: 'onbekend', alternatief: null, besparing: 0, familie: familieNaam(fam), vergelijking: null };
-      if (p.eenheid && geldig(p.prijsPerEenheid) && (p.eenheid !== 'stuk' || (fam && STUK_FAMILIES.has(fam)))) {
+      if (p.eenheid && geldig(p.prijsPerEenheid) && (p.eenheid !== 'stuk' || stukCategorie(fam))) {
         const plausibel = (l, grens) => (l ? l.filter((c) => c.prijsPerEenheid >= p.prijsPerEenheid * grens) : null);
         let lijst = isOverig(p.categorie) ? null : plausibel(perCat.get(sleutel(p)), MIN_VERHOUDING), soort = 'categorie';
         if (!lijst || !genoeg(p, w.winkel, lijst)) { lijst = fam ? plausibel(perFam.get(fam + '|' + p.eenheid), MIN_VERHOUDING_FAMILIE) : null; soort = 'familie'; }
@@ -101,6 +102,20 @@ export function beoordeel(winkels, vandaag = vandaagNL()) {
   return uit;
 }
 
+// Eenheid als kg / l / stuk / null (contract). Spelling (KG, ltr, liter, stuks) wordt rechtgezet, al het andere wordt null.
+const EENHEDEN = { kg: 'kg', l: 'l', ltr: 'l', liter: 'l', stuk: 'stuk', stuks: 'stuk' };
+export const normEenheid = (e) => (typeof e === 'string' ? EENHEDEN[e.trim().toLowerCase()] ?? null : null);
+function normaliseerEenheden(lijst) {
+  let onbekend = 0;
+  const uit = lijst.map((p) => {
+    if (!p || typeof p !== 'object' || p.eenheid == null) return p;
+    const e = normEenheid(p.eenheid);
+    if (e === null) onbekend++;
+    return e === p.eenheid ? p : { ...p, eenheid: e };
+  });
+  return { uit, onbekend };
+}
+
 // Leest alle winkelbestanden in `dir`; kapotte bestanden worden overgeslagen en komen als waarschuwing terug.
 export function leesWinkels(dir, controleerLeeftijd = true) {
   const winkels = [], waarschuwingen = [];
@@ -112,7 +127,9 @@ export function leesWinkels(dir, controleerLeeftijd = true) {
       const j = JSON.parse(readFileSync(join(dir, n), 'utf8'));
       if (!j || !Array.isArray(j.aanbiedingen)) throw new Error('veld "aanbiedingen" ontbreekt');
       const id = String(j.winkel ?? n.slice(0, -5));
-      winkels.push({ winkel: id, naam: j.naam ?? id, gemaakt: j.gemaakt ?? null, aanbiedingen: j.aanbiedingen, referentie: Array.isArray(j.referentie) ? j.referentie : [] });
+      const ne = normaliseerEenheden(j.aanbiedingen), nr = normaliseerEenheden(Array.isArray(j.referentie) ? j.referentie : []);
+      winkels.push({ winkel: id, naam: j.naam ?? id, gemaakt: j.gemaakt ?? null, aanbiedingen: ne.uit, referentie: nr.uit });
+      if (ne.onbekend + nr.onbekend) waarschuwingen.push(`${j.naam ?? id}: ${ne.onbekend + nr.onbekend} producten met een onbekende eenheid (alleen kg, l, stuk of leeg), zonder vergelijking`);
       if (typeof j.waarschuwing === 'string' && j.waarschuwing) waarschuwingen.push(`${j.naam ?? id}: ${j.waarschuwing}`);
       const leeftijd = j.gemaakt ? Date.now() - Date.parse(j.gemaakt) : NaN;
       if (controleerLeeftijd && !(leeftijd <= 48 * 3600e3)) waarschuwingen.push(`${j.naam ?? id}: gegevens zijn ouder dan 2 dagen of hebben geen geldige datum (gemaakt)`);
