@@ -47,21 +47,30 @@ Leest alle `data/<winkel>.json`, geeft elke aanbieding een `oordeel` en `alterna
 
 ```json
 { "gemaakt": "...", "winkels": [{"id":"ah","naam":"Albert Heijn"}], "aanbiedingen": [ Product + {
-  "winkel": "ah", "oordeel": "goed|huismerk-goedkoper|merk-goedkoper|onbekend",
+  "winkel": "ah", "oordeel": "goed|huismerk-goedkoper|merk-goedkoper|onbekend", "familie": "Brood", "vergelijking": "categorie|familie|null",
   "alternatief": { "winkel":"ah","titel":"...","merk":"...","huismerk":true,"prijsPerEenheid":1.2 } | null,
   "besparing": 0.35 } ] }
 ```
 
-Regel: vergelijk `prijsPerEenheid` met het goedkoopste product in dezelfde `categorie` en `eenheid` (referentie + andere
-aanbiedingen; alleen dezelfde winkel is te streng, over winkels heen is toegestaan en wordt als `alternatief.winkel` getoond).
-`goed` = aanbieding is (bijna) het goedkoopst (binnen 5%); anders `huismerk-goedkoper` als het alternatief huismerk is,
-anders `merk-goedkoper`; `onbekend` zonder eenheidsprijs of vergelijkbaar product. `besparing` = euro per kg/l verschil.
+Regel (`beoordeel` in `vergelijk.mjs`, families in `familie.mjs`): vergelijk `prijsPerEenheid` op dezelfde `eenheid`.
+1. Elk product krijgt een grove **familie** (brood, kaas, melk, cola, ...) uit categorie + titel (trefwoorden, eerste treffer wint;
+   grabbelbakken als non-food en maaltijden krijgen geen familie, 'Overig' op de pagina).
+2. Kandidaten = referentie + alle aanbiedingen (alle winkels, behalve de aanbieding zelf). Eerste keus: dezelfde winkelcategorie.
+   Alleen als daar niet **genoeg** is (>= 3 kandidaten en minstens een van een andere winkel of een ander merk; alle huismerken
+   van een winkel tellen als een merk) wordt de hele familie genomen (`vergelijking: "familie"`, anders `"categorie"`).
+3. `goed` = er is genoeg vergelijking en de aanbieding ligt binnen 5% van het goedkoopste; anders `huismerk-goedkoper` als het goedkoopste
+   een huismerk is, anders `merk-goedkoper` (met `alternatief` en `besparing` = euro per kg/l verschil). `onbekend` (pagina: 'Geen goede
+   vergelijking', `vergelijking: null`) zonder eenheidsprijs of zonder genoeg vergelijking; `goed` heeft nooit een alternatief.
+4. Eenheid `stuk` wordt alleen vergeleken in families waar dat zinvol is (brood, broodjes, eieren, groente, fruit); een half brood is een
+   eigen familie. Verder gaat het om gewichtprijs (kg/l); per stuk zonder zinvolle familie is `onbekend`.
+
+`familie` (nette naam, bv. "Brood", "Overig") en `vergelijking` staan in de volledige vorm; `familie` ook in de compacte vorm.
 
 ## Pagina
 
 `serve.mjs` serveert `build/` op 127.0.0.1:**8092** (8090 is growatt), alleen loopback; later tailscale https :8445.
 `index.html` is statisch en haalt `aanbiedingen.json` op (fetch); beide worden door `sw.js` gecachet. `serve.mjs` levert
-de vooraf gemaakte `.gz` als de browser gzip accepteert. Filter op winkel (knoppen, meerkeuze), op oordeel, zoekveld;
+de vooraf gemaakte `.gz` als de browser gzip accepteert. Filter op winkel (knoppen, meerkeuze), op oordeel, op familie (dropdown met aantallen, onthouden in localStorage), zoekveld;
 sorteren op besparing/prijs per kg-l. De lijst toont 60 kaarten per keer ('Toon meer').
 
 ### `build/aanbiedingen.json` (compacte vorm voor de pagina)
@@ -72,7 +81,7 @@ sorteren op besparing/prijs per kg-l. De lijst toont 60 kaarten per keer ('Toon 
 { "gemaakt": "...", "fixtures": false, "fout": "waarschuwingen of ''", "winkels": [{"id":"ah","naam":"..."}],
   "alternatieven": [ {"winkel":"ah","titel":"...","prijsPerEenheid":1.2,"huismerk":true} ],
   "afbeeldingen": { "ah": {"voor":"https://static.ah.nl/dam/product/","na":"?revLabel=1&..."} },
-  "aanbiedingen": [ {"winkel","titel","prijs","oordeel", + alleen aanwezige: merk, categorie, inhoud, eenheid, normaalPrijs,
+  "aanbiedingen": [ {"winkel","titel","prijs","oordeel","familie", + alleen aanwezige: merk, categorie, inhoud, eenheid, normaalPrijs,
     prijsPerEenheid, mechanisme, geldigTot, afbeelding, besparing, alternatief} ] }
 ```
 

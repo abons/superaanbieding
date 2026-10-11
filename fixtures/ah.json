@@ -240,6 +240,20 @@
    "afbeelding": null
   },
   {
+   "id": "ar3b",
+   "titel": "Perla Filterkoffie",
+   "merk": "Perla",
+   "huismerk": false,
+   "categorie": "Koffie filter",
+   "inhoud": "500 g",
+   "eenheid": "kg",
+   "prijs": 4.1,
+   "normaalPrijs": null,
+   "prijsPerEenheid": 8.2,
+   "normaalPerEenheid": null,
+   "afbeelding": null
+  },
+  {
    "id": "ar4",
    "titel": "AH Chips naturel",
    "merk": "AH",

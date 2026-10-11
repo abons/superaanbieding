@@ -76,7 +76,7 @@ li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radiu
     <input type="search" id="zoek" placeholder="Zoek op product of merk" aria-label="Zoeken" autocomplete="off">
     <div class="rij" id="winkels" role="group" aria-label="Supermarkt"></div>
     <div class="rij" id="oordelen" role="group" aria-label="Oordeel"></div>
-    <div class="rij twee"><select id="sorteer" aria-label="Sorteren">
+    <div class="rij twee"><select id="familie" aria-label="Productfamilie"></select><select id="sorteer" aria-label="Sorteren">
       <option value="besparing">Sorteer: grootste besparing</option>
       <option value="prijs">Sorteer: laagste prijs per kg/l</option>
     </select></div>
@@ -90,8 +90,8 @@ li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radiu
 const PAGINA = 60; // kaarten per keer in de DOM
 let DATA = { winkels: [], aanbiedingen: [], alternatieven: [], afbeeldingen: {} };
 
-const OORDELEN = [['', 'Alles'], ['goed', 'Goede deal'], ['huismerk-goedkoper', 'Huismerk goedkoper'], ['merk-goedkoper', 'Merk goedkoper'], ['onbekend', 'Onbekend']];
-const BADGE = { 'goed': 'Goede deal', 'huismerk-goedkoper': 'Huismerk goedkoper', 'merk-goedkoper': 'Merk goedkoper', 'onbekend': 'Niet te vergelijken' };
+const OORDELEN = [['', 'Alles'], ['goed', 'Goede deal'], ['huismerk-goedkoper', 'Huismerk goedkoper'], ['merk-goedkoper', 'Merk goedkoper'], ['onbekend', 'Geen vergelijking']];
+const BADGE = { 'goed': 'Goede deal', 'huismerk-goedkoper': 'Huismerk goedkoper', 'merk-goedkoper': 'Merk goedkoper', 'onbekend': 'Geen goede vergelijking' };
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
 const EENHEID = { kg: 'kg', l: 'l', stuk: 'stuk' };
 
@@ -103,6 +103,7 @@ let winkelNamen = new Map();
 const toestand = {
   winkels: new Set(opslag.lees('winkels', [])), // leeg = alle (onbekende ids worden na het laden opgeschoond)
   oordeel: opslag.lees('oordeel', ''),
+  familie: String(opslag.lees('familie', '')), // '' = alle families
   sorteer: opslag.lees('sorteer', 'besparing'),
   zoek: '',
   zichtbaar: PAGINA,
@@ -156,7 +157,7 @@ function kaart(a) {
   } else plaatje.textContent = (a.titel || '?').trim().charAt(0).toUpperCase();
   const t = el('div');
   t.append(el('div', { class: 'titel' }, a.titel));
-  t.append(el('div', { class: 'meta' }, [winkelNamen.get(a.winkel) || a.winkel, a.merk, a.inhoud].filter(Boolean).join(' · ')));
+  t.append(el('div', { class: 'meta' }, [winkelNamen.get(a.winkel) || a.winkel, a.merk, a.inhoud, a.familie && a.familie !== 'Overig' ? a.familie : ''].filter(Boolean).join(' · ')));
   const p = el('div', { class: 'prijzen' });
   p.append(el('span', { class: 'prijs' }, euro.format(a.prijs)));
   if (a.normaalPrijs && a.normaalPrijs > a.prijs) p.append(el('span', { class: 'oud' }, euro.format(a.normaalPrijs)));
@@ -183,10 +184,13 @@ let resultaat = [], laden = true, zoekTimer = 0;
 function teken() {
   toestand.zichtbaar = PAGINA;
   const termen = woorden(toestand.zoek).split(' ').filter(Boolean).map((t) => ' ' + t);
-  let l = DATA.aanbiedingen.filter((a) =>
+  // Eerst alles behalve de familie; daar tellen we de families uit, zodat de aantallen bij de andere filters passen.
+  const basis = DATA.aanbiedingen.filter((a) =>
     (!toestand.winkels.size || toestand.winkels.has(a.winkel)) &&
     (!toestand.oordeel || a.oordeel === toestand.oordeel) &&
     (!termen.length || termen.every((t) => a._z.includes(t))));
+  familieKeuze(basis);
+  let l = toestand.familie ? basis.filter((a) => (a.familie || 'Overig') === toestand.familie) : basis;
   if (toestand.sorteer === 'prijs') {
     l.sort((x, y) => (x.prijsPerEenheid ?? Infinity) - (y.prijsPerEenheid ?? Infinity) || x.titel.localeCompare(y.titel, 'nl'));
   } else {
@@ -197,6 +201,15 @@ function teken() {
   const ul = $('lijst'); ul.replaceChildren();
   if (!l.length) ul.append(el('li', { class: 'leeg' }, laden ? 'Laden…' : DATA.aanbiedingen.length ? 'Niets gevonden met deze filters.' : 'Nog geen aanbiedingen beschikbaar.'));
   meer(0);
+}
+function familieKeuze(basis) {
+  const tel = new Map();
+  for (const a of basis) { const f = a.familie || 'Overig'; tel.set(f, (tel.get(f) || 0) + 1); }
+  if (toestand.familie && !tel.has(toestand.familie)) tel.set(toestand.familie, 0);
+  const lijst = [...tel].sort((x, y) => (x[0] === 'Overig') - (y[0] === 'Overig') || y[1] - x[1] || x[0].localeCompare(y[0], 'nl'));
+  const sel = $('familie');
+  sel.replaceChildren(el('option', { value: '' }, `Alle producten (${basis.length})`), ...lijst.map(([f, n]) => el('option', { value: f }, `${f} (${n})`)));
+  sel.value = toestand.familie;
 }
 function meer(vanaf) {
   const tot = Math.min(resultaat.length, toestand.zichtbaar);
@@ -209,6 +222,7 @@ function meer(vanaf) {
 }
 $('meer').onclick = () => { const van = Math.min(resultaat.length, toestand.zichtbaar); toestand.zichtbaar += PAGINA; meer(van); };
 
+$('familie').onchange = (e) => { toestand.familie = e.target.value; opslag.schrijf('familie', toestand.familie); teken(); };
 $('sorteer').value = toestand.sorteer;
 $('sorteer').onchange = (e) => { toestand.sorteer = e.target.value; opslag.schrijf('sorteer', toestand.sorteer); teken(); };
 $('zoek').oninput = (e) => { toestand.zoek = e.target.value; clearTimeout(zoekTimer); zoekTimer = setTimeout(teken, 150); };
