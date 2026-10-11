@@ -9,6 +9,7 @@ on:
     paths: ['invoer/**']
 permissions:
   contents: read
+  actions: write   # keepalive: GitHub zet geplande runs na 60 dagen zonder commits uit
   pages: write
   id-token: write
 concurrency:
@@ -17,22 +18,34 @@ concurrency:
 jobs:
   bouw:
     runs-on: ubuntu-latest
+    outputs:
+      mislukt: ${{ steps.verz.outputs.mislukt }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       # data/ bewaren tussen runs: AH bouwt zijn referentiedata over meerdere runs op (request-budget 400 per run).
-      - uses: actions/cache@v4
+      - id: herstel
+        uses: actions/cache/restore@v4
         with:
           path: data
           key: data-${{ github.run_id }}
           restore-keys: data-
       - name: verzamelaars
+        id: verz
         run: |
           mkdir -p data
+          mislukt=""
           for w in ah aldi boons dirk jumbo lidl; do
-            node winkels/$w.mjs || echo "::warning::$w mislukt (vorige data blijft staan)"
+            node winkels/$w.mjs || { echo "::warning::$w mislukt (vorige data blijft staan)"; mislukt="$mislukt $w"; }
           done
+          echo "mislukt=$mislukt" >> "$GITHUB_OUTPUT"
+      # Ook bewaren als test of merge hierna faalt: anders gaat wat AH deze run opbouwde verloren.
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data
+          key: data-${{ github.run_id }}
       - run: node test.mjs
       - run: node vergelijk.mjs
       - uses: actions/upload-pages-artifact@v3
@@ -46,3 +59,18 @@ jobs:
     steps:
       - id: d
         uses: actions/deploy-pages@v4
+  controle:
+    # Houdt de run niet groen als een verzamelaar mislukte: dan staat er oude data online en moet je dat merken (mail van GitHub).
+    needs: [bouw, publiceer]
+    if: always() && needs.bouw.outputs.mislukt != ''
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::verzamelaars mislukt:${{ needs.bouw.outputs.mislukt }}"
+          exit 1
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh api -X PUT repos/${{ github.repository }}/actions/workflows/publiceer.yml/enable
+        env:
+          GH_TOKEN: ${{ github.token }}

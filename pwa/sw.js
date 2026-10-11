@@ -13,7 +13,7 @@ const uitCache = async (req) => {
 };
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(
-  caches.keys().then((namen) => Promise.all(namen.filter((n) => n !== CACHE).map((n) => caches.delete(n)))).then(() => self.clients.claim()),
+  caches.keys().then((namen) => Promise.all(namen.filter((n) => n.startsWith('superaanbieding-') && n !== CACHE).map((n) => caches.delete(n)))).then(() => self.clients.claim()),
 ));
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
