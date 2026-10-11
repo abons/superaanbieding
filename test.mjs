@@ -14,16 +14,20 @@ const een = (winkels, id = 'x') => beoordeel(winkels).find((a) => a.id === id);
 // Drie referenties van een ander merk: genoeg voor een echte vergelijking.
 const refs = (...prijzen) => prijzen.map((pr, i) => p({ id: 'r' + i, merk: 'Pepsi', prijsPerEenheid: pr }));
 
-// Goedkoopste in de categorie met genoeg kandidaten = goed.
+// Goedkoopste in de categorie met genoeg kandidaten = beste.
 let a = een([w('ah', [p({ prijsPerEenheid: 1 })], refs(2, 3, 4))]);
-assert.equal(a.oordeel, 'goed'); assert.equal(a.alternatief, null); assert.equal(a.besparing, 0); assert.equal(a.vergelijking, 'categorie');
+assert.equal(a.oordeel, 'beste'); assert.equal(a.alternatief, null); assert.equal(a.besparing, 0); assert.equal(a.vergelijking, 'categorie');
 
 // Te weinig kandidaten (minder dan 3) = geen echte vergelijking.
 assert.equal(een([w('ah', [p({ prijsPerEenheid: 1 })], refs(2, 3))]).oordeel, 'onbekend');
 assert.equal(een([w('ah', [p()], [p({ id: 'r', prijsPerEenheid: 2 })])]).vergelijking, null);
 
-// Binnen 5% is nog goed, daarbuiten niet.
+// Binnen 5% van het goedkoopste is goed (niet beste), daarbuiten niet; gelijk aan het goedkoopste is beste.
 assert.equal(een([w('ah', [p({ prijsPerEenheid: 1.05 })], refs(1, 2, 3))]).oordeel, 'goed');
+assert.equal(een([w('ah', [p({ prijsPerEenheid: 1 })], refs(1, 2, 3))]).oordeel, 'beste');
+// De kipbouten-case: 5,39 naast 5,46 per kg: de goedkoopste is beste, de ander goed.
+const kip = [p({ id: 'k1', prijsPerEenheid: 5.39 }), p({ id: 'k2', merk: 'Pepsi', prijsPerEenheid: 5.46 })];
+assert.deepEqual([een([w('ah', kip, refs(7, 8, 9))], 'k1').oordeel, een([w('ah', kip, refs(7, 8, 9))], 'k2').oordeel], ['beste', 'goed']);
 assert.notEqual(een([w('ah', [p({ prijsPerEenheid: 1.06 })], refs(1, 2, 3))]).oordeel, 'goed');
 
 // Huismerk goedkoper, met besparing in euro per kg/l.
@@ -124,7 +128,7 @@ a = een([w('ah', oer, ahRef), boons], 'o1');
 assert.notEqual(a.oordeel, 'goed'); assert.equal(a.oordeel, 'huismerk-goedkoper'); assert.equal(a.vergelijking, 'familie');
 assert.equal(a.alternatief.id, 't'); assert.equal(a.besparing, 0.5); assert.equal(a.familie, 'Brood');
 // Zonder goedkoper heel brood is het 'goed' (echte vergelijking, ander merk aanwezig); zonder ander merk of winkel blijft het 'onbekend'.
-assert.equal(een([w('ah', oer, ahRef.map((r) => ({ ...r, prijsPerEenheid: 1.99, prijs: 1.99 }))), boons], 'o1').oordeel, 'goed');
+assert.equal(een([w('ah', oer, ahRef.map((r) => ({ ...r, prijsPerEenheid: 1.99, prijs: 1.99 }))), boons], 'o1').oordeel, 'beste'); // gelijk aan het goedkoopste
 assert.equal(een([w('ah', oer, ahRef.map((r) => ({ ...r, prijsPerEenheid: 1.99, prijs: 1.99 })))], 'o1').oordeel, 'onbekend');
 
 // Families: grove indeling uit categorie + titel.
@@ -158,6 +162,6 @@ assert.equal(ontbreekt.winkels.length, 0); assert.equal(ontbreekt.waarschuwingen
 const fx = leesWinkels('fixtures', false);
 assert.equal(fx.winkels.length, 2);
 const tel = new Set(beoordeel(fx.winkels).map((x) => x.oordeel));
-for (const o of ['goed', 'huismerk-goedkoper', 'merk-goedkoper', 'onbekend']) assert.ok(tel.has(o), 'fixtures missen ' + o);
+for (const o of ['beste', 'goed','huismerk-goedkoper', 'merk-goedkoper', 'onbekend']) assert.ok(tel.has(o), 'fixtures missen ' + o);
 
 console.log('test.mjs: alles ok');

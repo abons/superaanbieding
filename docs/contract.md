@@ -47,7 +47,7 @@ Leest alle `data/<winkel>.json`, geeft elke aanbieding een `oordeel` en `alterna
 
 ```json
 { "gemaakt": "...", "winkels": [{"id":"ah","naam":"Albert Heijn"}], "aanbiedingen": [ Product + {
-  "winkel": "ah", "oordeel": "goed|huismerk-goedkoper|merk-goedkoper|onbekend", "familie": "Brood", "vergelijking": "categorie|familie|null",
+  "winkel": "ah", "oordeel": "beste|goed|huismerk-goedkoper|merk-goedkoper|onbekend", "familie": "Brood", "vergelijking": "categorie|familie|null",
   "alternatief": { "winkel":"ah","titel":"...","merk":"...","huismerk":true,"prijsPerEenheid":1.2 } | null,
   "besparing": 0.35 } ] }
 ```
@@ -58,9 +58,10 @@ Regel (`beoordeel` in `vergelijk.mjs`, families in `familie.mjs`): vergelijk `pr
 2. Kandidaten = referentie + alle aanbiedingen (alle winkels, behalve de aanbieding zelf). Eerste keus: dezelfde winkelcategorie.
    Alleen als daar niet **genoeg** is (>= 3 kandidaten en minstens een van een andere winkel of een ander merk; alle huismerken
    van een winkel tellen als een merk) wordt de hele familie genomen (`vergelijking: "familie"`, anders `"categorie"`).
-3. `goed` = er is genoeg vergelijking en de aanbieding ligt binnen 5% van het goedkoopste; anders `huismerk-goedkoper` als het goedkoopste
+3. `beste` = er is genoeg vergelijking en de aanbieding is het goedkoopste (of gelijk eraan); `goed` = idem maar tot 5% duurder dan het
+   goedkoopste (de pagina sorteert `beste` boven `goed`); anders `huismerk-goedkoper` als het goedkoopste
    een huismerk is, anders `merk-goedkoper` (met `alternatief` en `besparing` = euro per kg/l verschil). `onbekend` (pagina: 'Geen goede
-   vergelijking', `vergelijking: null`) zonder eenheidsprijs of zonder genoeg vergelijking; `goed` heeft nooit een alternatief.
+   vergelijking', `vergelijking: null`) zonder eenheidsprijs of zonder genoeg vergelijking; `beste` en `goed` hebben nooit een alternatief.
 4. Eenheid `stuk` wordt alleen vergeleken in families waar dat zinvol is (brood, broodjes, eieren, groente, fruit); een half brood is een
    eigen familie. Verder gaat het om gewichtprijs (kg/l); per stuk zonder zinvolle familie is `onbekend`.
 

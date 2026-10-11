@@ -55,7 +55,8 @@ li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radiu
 .oud { color: var(--zacht); text-decoration: line-through; font-size: .9rem; }
 .eenh { color: var(--zacht); font-size: .85rem; }
 .badge { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 999px; font-size: .85rem; font-weight: 700; }
-.badge.goed { background: var(--goed-bg); color: var(--goed); }
+.badge.goed, .badge.beste { background: var(--goed-bg); color: var(--goed); }
+.badge.beste { box-shadow: inset 0 0 0 2px var(--goed); }
 .badge.huismerk-goedkoper { background: var(--huis-bg); color: var(--huis); }
 .badge.merk-goedkoper { background: var(--merk-bg); color: var(--merk); }
 .badge.onbekend { background: var(--onb-bg); color: var(--onb); }
@@ -90,8 +91,9 @@ li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radiu
 const PAGINA = 60; // kaarten per keer in de DOM
 let DATA = { winkels: [], aanbiedingen: [], alternatieven: [], afbeeldingen: {} };
 
-const OORDELEN = [['', 'Alles'], ['goed', 'Goede deal'], ['huismerk-goedkoper', 'Huismerk goedkoper'], ['merk-goedkoper', 'Merk goedkoper'], ['onbekend', 'Geen vergelijking']];
-const BADGE = { 'goed': 'Goede deal', 'huismerk-goedkoper': 'Huismerk goedkoper', 'merk-goedkoper': 'Merk goedkoper', 'onbekend': 'Geen goede vergelijking' };
+const OORDELEN = [['', 'Alles'], ['beste', 'Beste deal'], ['goed', 'Goede deal'],['huismerk-goedkoper', 'Huismerk goedkoper'], ['merk-goedkoper', 'Merk goedkoper'], ['onbekend', 'Geen vergelijking']];
+const RANG = { beste: 0, goed: 1, 'huismerk-goedkoper': 2, 'merk-goedkoper': 2, onbekend: 3 }; // bij gelijke besparing: beste deals eerst
+const BADGE = { 'beste': 'Beste deal', 'goed':'Goede deal', 'huismerk-goedkoper': 'Huismerk goedkoper', 'merk-goedkoper': 'Merk goedkoper', 'onbekend': 'Geen goede vergelijking' };
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
 const EENHEID = { kg: 'kg', l: 'l', stuk: 'stuk' };
 
@@ -194,7 +196,7 @@ function teken() {
   if (toestand.sorteer === 'prijs') {
     l.sort((x, y) => (x.prijsPerEenheid ?? Infinity) - (y.prijsPerEenheid ?? Infinity) || x.titel.localeCompare(y.titel, 'nl'));
   } else {
-    l.sort((x, y) => (y.besparing || 0) - (x.besparing || 0) || (x.oordeel === 'goed' ? -1 : 0) - (y.oordeel === 'goed' ? -1 : 0) || x.titel.localeCompare(y.titel, 'nl'));
+    l.sort((x, y) => (y.besparing || 0) - (x.besparing || 0) || RANG[x.oordeel] - RANG[y.oordeel] || x.titel.localeCompare(y.titel, 'nl'));
   }
   resultaat = l;
   $('aantal').textContent = laden ? '' : `${l.length} van ${DATA.aanbiedingen.length} aanbiedingen`;

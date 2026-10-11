@@ -80,7 +80,8 @@ export function beoordeel(winkels, vandaag = vandaagNL()) {
         if (lijst && genoeg(p, w.winkel, lijst)) {
           const alt = lijst.find((c) => !(c.winkel === w.winkel && c.id === p.id));
           basis.vergelijking = soort;
-          if (p.prijsPerEenheid <= alt.prijsPerEenheid * (1 + DREMPEL)) basis.oordeel = 'goed';
+          if (p.prijsPerEenheid <= alt.prijsPerEenheid) basis.oordeel = 'beste'; // goedkoopste (of gelijk) van de vergelijking
+          else if (p.prijsPerEenheid <= alt.prijsPerEenheid * (1 + DREMPEL)) basis.oordeel = 'goed';
           else {
             basis.oordeel = alt.huismerk ? 'huismerk-goedkoper' : 'merk-goedkoper';
             basis.alternatief = alt;
