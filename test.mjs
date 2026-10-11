@@ -2,8 +2,9 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { beoordeel, inkort, leesWinkels, pakLock, LOCK_STALE_MS, MIN_VERHOUDING } from './vergelijk.mjs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { beoordeel, inkort, leesWinkels, pakLock, LOCK_STALE_MS, MIN_VERHOUDING, MIN_VERHOUDING_FAMILIE } from './vergelijk.mjs';
 import { kiesInvoer } from './winkels/boons.mjs';
 import { isGratisCadeauZonderKorting } from './winkels/jumbo.mjs';
 import { familieVan, familieNaam } from './familie.mjs';
@@ -109,7 +110,7 @@ assert.equal(isGratisCadeauZonderKorting({ mechanisme: null, prijs: 2, normaalPr
 assert.equal(een([w('ah', [p({ prijsPerEenheid: 3 })], [...refs(1, 2, 3).map((r) => ({ ...r, categorie: ' cola ' })), p({ id: 's', prijsPerEenheid: null })])]).oordeel, 'merk-goedkoper');
 
 // Familie-terugval: smalle categorie te klein, dan de grove familie (cola in meerdere winkelcategorieen).
-a = een([w('ah', [p({ categorie: 'Cola zero', prijsPerEenheid: 3 })], [p({ id: 'r1', categorie: 'Cola regular', merk: 'Pepsi', prijsPerEenheid: 1 }), p({ id: 'r2', categorie: 'Cola regular', merk: 'Pepsi', prijsPerEenheid: 2 }), p({ id: 'r3', categorie: 'Cola light', merk: 'Pepsi', prijsPerEenheid: 2 })])]);
+a = een([w('ah', [p({ categorie: 'Cola zero', prijsPerEenheid: 3 })], [p({ id: 'r1', categorie: 'Cola regular', merk: 'Pepsi', prijsPerEenheid: 1.6 }), p({ id: 'r2', categorie: 'Cola regular', merk: 'Pepsi', prijsPerEenheid: 2 }), p({ id: 'r3', categorie: 'Cola light', merk: 'Pepsi', prijsPerEenheid: 2 })])]);
 assert.equal(a.vergelijking, 'familie'); assert.equal(a.familie, 'Cola'); assert.equal(a.oordeel, 'merk-goedkoper'); assert.equal(a.alternatief.id, 'r1');
 
 // Per stuk alleen waar dat zinvol is: een brood wel, een kaars niet.
@@ -158,11 +159,21 @@ assert.deepEqual(beoordeel([w('ah', [null, { titel: 'zonder prijs' }])]), []);
 const ontbreekt = leesWinkels('bestaat-niet');
 assert.equal(ontbreekt.winkels.length, 0); assert.equal(ontbreekt.waarschuwingen.length, 1);
 
-// De fixtures leveren een mix van oordelen.
-const fx = leesWinkels('fixtures', false);
+// De fixtures leveren een mix van oordelen, en per product het verwachte oordeel (een verwisseling van oordelen valt dan op).
+const fx = leesWinkels(join(dirname(fileURLToPath(import.meta.url)), 'fixtures'), false);
 assert.equal(fx.winkels.length, 2);
-const tel = new Set(beoordeel(fx.winkels).map((x) => x.oordeel));
+const fxUit = beoordeel(fx.winkels);
+const tel = new Set(fxUit.map((x) => x.oordeel));
 for (const o of ['beste', 'goed','huismerk-goedkoper', 'merk-goedkoper', 'onbekend']) assert.ok(tel.has(o), 'fixtures missen ' + o);
+const fxOordeel = (winkel, id) => fxUit.find((x) => x.winkel === winkel && x.id === id).oordeel;
+assert.deepEqual(['a1', 'a5', 'a7', 'a3'].map((id) => fxOordeel('ah', id)), ['huismerk-goedkoper', 'merk-goedkoper', 'goed', 'onbekend']);
+assert.deepEqual(['d6', 'd11', 'd3', 'd1'].map((id) => fxOordeel('dirk', id)), ['beste', 'beste', 'huismerk-goedkoper', 'onbekend']);
+// Invarianten van het contract: beste/goed hebben geen alternatief en geen besparing, onbekend geen vergelijking.
+for (const x of fxUit) {
+  if (x.oordeel === 'beste' || x.oordeel === 'goed') { assert.equal(x.alternatief, null); assert.equal(x.besparing, 0); }
+  if (x.oordeel === 'onbekend') assert.equal(x.vergelijking, null);
+  else assert.ok(x.vergelijking === 'categorie' || x.vergelijking === 'familie');
+}
 
 // online-vlag: blijft in de compacte vorm als true, ontbreekt anders.
 {
@@ -176,6 +187,55 @@ for (const o of ['beste', 'goed','huismerk-goedkoper', 'merk-goedkoper', 'onbeke
   const o = beoordeel([w('ah', [p({ id: 'a', titel: 'a', prijsPerEenheid: 3 })], [...refs(2, 4, 5), p({ id: 'on', titel: 'on', merk: 'X', prijsPerEenheid: 1, online: true })])]).find((x) => x.id === 'a');
   assert.equal(o.alternatief.id, 'on'); assert.equal(o.alternatief.online, true);
   assert.equal(inkort([o]).alternatieven[0].online, true);
+}
+
+// Familie-terugval gebruikt een strengere plausibiliteitsgrens (0,5) dan de categorie (0,2): pesto 25 vs lasagne 5 is geen alternatief.
+assert.equal(MIN_VERHOUDING_FAMILIE, 0.5);
+const colaRefs = (...prijzen) => prijzen.map((pr, i) => p({ id: 'c' + i, categorie: 'Cola regular ' + i, merk: 'Pepsi', prijsPerEenheid: pr }));
+a = een([w('ah', [p({ categorie: 'Cola zero', prijsPerEenheid: 3 })], colaRefs(0.9, 1, 1.2))]); // 0,3-0,4x: via familie niet plausibel
+assert.equal(a.oordeel, 'onbekend'); assert.equal(a.vergelijking, null);
+a = een([w('ah', [p({ categorie: 'Cola zero', prijsPerEenheid: 3 })], colaRefs(1.6, 2, 2.5))]); // >= 0,5x telt wel
+assert.equal(a.vergelijking, 'familie'); assert.equal(a.alternatief.id, 'c0');
+// De categorie wint van de familie als die zelf genoeg kandidaten heeft; zonder familie geen terugval.
+a = een([w('ah', [p({ categorie: 'Cola zero', prijsPerEenheid: 3 })], [...refs(2, 3.5, 4).map((r) => ({ ...r, categorie: 'Cola zero' })), ...colaRefs(0.1)])]);
+assert.equal(a.vergelijking, 'categorie'); assert.equal(a.alternatief.id, 'r0');
+a = een([w('ah', [p({ categorie: 'Tuinmeubelen', prijsPerEenheid: 3 })], refs(1, 2, 2.5).map((r) => ({ ...r, categorie: 'Overig' })))]);
+assert.equal(a.oordeel, 'onbekend'); assert.equal(a.vergelijking, null);
+
+// Zelf-uitsluiting en drempel: aanbieding + 2 referenties = 2 kandidaten = onbekend; 3 kandidaten waarvan 1 implausibel = 2 over = onbekend.
+assert.equal(een([w('ah', [p()], refs(2, 3))]).oordeel, 'onbekend');
+assert.equal(een([w('ah', [p({ prijsPerEenheid: 100 })], refs(1, 50, 60))]).oordeel, 'onbekend');
+assert.equal(een([w('ah', [p({ prijsPerEenheid: 100 })], refs(30, 50, 60))]).oordeel, 'merk-goedkoper');
+
+// Product zonder id sluit de rest van zijn winkel niet uit als kandidaat (objectidentiteit in plaats van undefined === undefined).
+{
+  const zonderId = (o) => p({ id: undefined, ...o });
+  const o = beoordeel([w('ah', [zonderId({ titel: 'a', prijsPerEenheid: 1 })], [zonderId({ titel: 'r1', merk: 'Pepsi', prijsPerEenheid: 2 }), zonderId({ titel: 'r2', merk: 'Pepsi', prijsPerEenheid: 3 }), zonderId({ titel: 'r3', merk: 'Pepsi', prijsPerEenheid: 4 })])]);
+  assert.equal(o[0].oordeel, 'beste');
+}
+
+// Online: een online-aanbieding krijgt gewoon een oordeel, en de vlag blijft in de uitvoer.
+a = een([w('ah', [p({ online: true, prijsPerEenheid: 1 })], refs(2, 3, 4))]);
+assert.equal(a.oordeel, 'beste'); assert.equal(a.online, true);
+
+// Rommel in de prijzen: 0, negatief, NaN en strings worden nooit getoond of kandidaat (string-eenheidsprijs "1,25" evenmin).
+for (const pr of [0, -1, NaN, '1,25', null]) assert.deepEqual(beoordeel([w('ah', [p({ prijs: pr })], refs(1, 2, 3))]), [], 'prijs ' + pr);
+assert.equal(een([w('ah', [p({ prijsPerEenheid: 3 })], [...refs(1, 2), p({ id: 's', merk: 'Pepsi', prijsPerEenheid: '0,5' })])]).oordeel, 'onbekend'); // de string-kandidaat telt niet
+assert.deepEqual(beoordeel([w('ah', [p({ categorie: null, titel: 'Tuinstoel' })], refs(1, 2, 3).map((r) => ({ ...r, categorie: null, titel: 'Kruk' })))]).map((x) => x.oordeel), ['onbekend']); // geen categorie en geen familie
+
+// geldigTot in een ander formaat dan jjjj-mm-dd verdwijnt als string-vergelijking stil: zo'n datum is geen verlopen datum.
+// (leesWinkels waarschuwt ervoor, zie hieronder)
+{
+  const t2 = mkdtempSync(join(tmpdir(), 'sa-test2-'));
+  const sw = (winkel, o) => writeFileSync(join(t2, winkel + '.json'), JSON.stringify({ winkel, naam: winkel, aanbiedingen: [], ...o }));
+  sw('zonder', {}); // geen gemaakt: waarschuwing
+  sw('kapot', { gemaakt: 'geen datum' }); // ongeldige datum: waarschuwing
+  sw('vers', { gemaakt: new Date().toISOString() }); // goed: geen waarschuwing
+  sw('oud', { gemaakt: new Date(Date.now() - 72 * 3600e3).toISOString() });
+  const r = leesWinkels(t2);
+  const wrn = (n) => r.waarschuwingen.filter((x) => x.startsWith(n + ':'));
+  assert.equal(wrn('zonder').length, 1); assert.equal(wrn('kapot').length, 1); assert.equal(wrn('oud').length, 1); assert.equal(wrn('vers').length, 0);
+  rmSync(t2, { recursive: true, force: true });
 }
 
 console.log('test.mjs: alles ok');

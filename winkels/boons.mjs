@@ -27,8 +27,14 @@ export function kiesInvoer(invoeren) {
 function nieuwsteInvoer() {
   const dir = path.join(MAP, 'invoer');
   const namen = fs.existsSync(dir) ? fs.readdirSync(dir).filter(n => /^boons-w\d+\.json$/.test(n)) : [];
-  const k = kiesInvoer(namen.map(naam => ({ naam, inv: JSON.parse(fs.readFileSync(path.join(dir, naam), 'utf8')) })));
-  return { bestand: path.join(dir, k.naam), inv: k.inv };
+  const invoeren = [], kapot = [];
+  for (const naam of namen) {
+    try { invoeren.push({ naam, inv: JSON.parse(fs.readFileSync(path.join(dir, naam), 'utf8')) }); }
+    catch (e) { kapot.push(`${naam} (${e.message})`); } // kapot bestand overslaan, de rest gewoon verwerken
+  }
+  const k = kiesInvoer(invoeren);
+  const waarschuwing = kapot.length ? `Boon's Markt: kapot invoerbestand overgeslagen: ${kapot.join('; ')}` : null;
+  return { bestand: path.join(dir, k.naam), inv: k.inv, waarschuwing };
 }
 
 // Aantal stuks waarvoor de stickerprijs geldt.
@@ -69,12 +75,12 @@ const CATS = [
 const categorie = t => (CATS.find(([re]) => re.test(t)) || [0, 'Overig'])[1];
 
 function main() {
-  const { bestand, inv } = nieuwsteInvoer();
+  const { bestand, inv, waarschuwing: kapotWaarschuwing } = nieuwsteInvoer();
   const dir = path.join(MAP, 'data');
   const vandaag = vandaagNL();
   if (!inv.geldigTot || inv.geldigTot < vandaag) {
     // Folder verlopen: liever niets dan oude prijzen als aanbieding. De waarschuwing komt via vergelijk.mjs op de pagina.
-    const waarschuwing = `Boon's Markt: folder ${path.basename(bestand)} is verlopen (geldig tot ${inv.geldigTot || 'onbekend'}), nieuwe invoer/boons-w<week>.json nodig`;
+    const waarschuwing = `Boon's Markt: folder ${path.basename(bestand)} is verlopen (geldig tot ${inv.geldigTot || 'onbekend'}), nieuwe invoer/boons-w<week>.json nodig` + (kapotWaarschuwing ? ` | ${kapotWaarschuwing}` : '');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'boons.json'), JSON.stringify({ winkel: 'boons', naam: "Boon's Markt", gemaakt: new Date().toISOString(), waarschuwing, aanbiedingen: [], referentie: [] }, null, 1));
     console.log('WAARSCHUWING: ' + waarschuwing);
@@ -110,9 +116,10 @@ function main() {
       afbeelding: null,
     });
   });
-  const uit = { winkel: 'boons', naam: "Boon's Markt", gemaakt: new Date().toISOString(), aanbiedingen, referentie: [] };
+  const uit = { winkel: 'boons', naam: "Boon's Markt", gemaakt: new Date().toISOString(), ...(kapotWaarschuwing ? { waarschuwing: kapotWaarschuwing } : {}), aanbiedingen, referentie: [] };
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'boons.json'), JSON.stringify(uit, null, 1));
+  if (kapotWaarschuwing) console.log('WAARSCHUWING: ' + kapotWaarschuwing);
   console.log(`boons: ${aanbiedingen.length} aanbiedingen uit ${path.basename(bestand)} (${inv.producten.length} regels; overgeslagen: ${overgeslagen.onzeker} onzeker, ${overgeslagen.zonderPrijs} zonder prijs)`);
 }
 

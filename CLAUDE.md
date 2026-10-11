@@ -12,8 +12,8 @@ See `README.md` for use, `docs/contract.md` for the data format (the contract be
 | `serve.mjs` | serves `build/` on 127.0.0.1:8092; runs collectors one by one, then `vergelijk.mjs`, at start and hourly; `--fixtures` skips collectors, `--geen-ophalen` skips them too but keeps real data; serves the pre-gzipped `build/*.gz` |
 | `pagina.html` | the page (static, copied to `build/index.html`; fetches `aanbiedingen.json`, renders 60 cards at a time + 'Toon meer'), mobile first, filters in localStorage (`sa-` keys) |
 | `pwa/` | manifest, `sw.js`, icons (`maak-iconen.mjs` draws the PNGs without libs) |
-| `fixtures/` | `ah.json`, `dirk.json` test data covering all four verdicts |
-| `test.mjs` | asserts on the judging rule: `node test.mjs` |
+| `fixtures/` | `ah.json`, `dirk.json` test data covering most of the five verdicts |
+| `test.mjs` | asserts on the judging rule, covers all five verdicts: `node test.mjs` |
 
 ## Rules
 

@@ -30,6 +30,7 @@ async function haalToken() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'User-Agent': UA, 'X-Application': 'AHWEBSHOP' },
     body: JSON.stringify({ clientId: 'appie' }),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!r.ok) throw new Error(`token ${r.status}`);
   token = (await r.json()).access_token;
@@ -44,13 +45,17 @@ async function zoek(params) {
     if (!token) await haalToken();
     requests++;
     await slaap(PAUZE);
-    const r = await fetch(`${BASIS}/mobile-services/product/search/v2?${qs}`, {
-      headers: { Authorization: `Bearer ${token}`, 'User-Agent': UA, 'X-Application': 'AHWEBSHOP' },
-    });
+    let r;
+    try {
+      r = await fetch(`${BASIS}/mobile-services/product/search/v2?${qs}`, {
+        headers: { Authorization: `Bearer ${token}`, 'User-Agent': UA, 'X-Application': 'AHWEBSHOP' },
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch { await slaap(2000 * (poging + 1)); continue; } // time-out of netwerkfout: opnieuw
     if (r.status === 401) { token = null; continue; }
     if (r.status === 429 || r.status >= 500) { await slaap(2000 * (poging + 1)); continue; }
     if (!r.ok) throw new Error(`search ${r.status} ${qs}`);
-    return r.json();
+    try { return await r.json(); } catch { await slaap(2000 * (poging + 1)); } // hangende of afgekapte body: opnieuw
   }
   throw new Error(`search faalde: ${qs}`);
 }
@@ -230,6 +235,11 @@ async function main() {
   } catch (e) {
     if (e instanceof Budget) afgebroken = e.message; else throw e;
   }
+  // Budget op tijdens de bonus-fase: gedeeltelijke lijst, dus het goede vorige ah.json laten staan.
+  if (afgebroken) {
+    console.error(`ah.mjs afgebroken in de bonus-fase (${afgebroken}, ${bonusProducten.size} bonusproducten); data/ah.json niet overschreven`);
+    process.exit(1);
+  }
 
   const aanbiedingen = [];
   for (const p of bonusProducten.values()) {
@@ -238,6 +248,14 @@ async function main() {
     const o = maakProduct(p, true);
     if (o && online) o.online = true;
     if (o && !(o.normaalPrijs != null && o.prijs > o.normaalPrijs * 1.001)) aanbiedingen.push(o);
+  }
+
+  // Te weinig aanbiedingen (0 of < 50% van het vorige bestand): niets wegschrijven.
+  let vorig = 0;
+  try { vorig = JSON.parse(await readFile(UIT, 'utf8')).aanbiedingen.length; } catch { /* geen of kapot vorig bestand */ }
+  if (!aanbiedingen.length || aanbiedingen.length < vorig * 0.5) {
+    console.error(`ah.mjs: ${aanbiedingen.length} aanbiedingen (vorige run ${vorig}), structuur gewijzigd? data/ah.json niet overschreven`);
+    process.exit(1);
   }
 
   // 2. referentie: niet-bonus producten uit de subcategorieen van de aanbiedingen. Per categorie gecachet

@@ -47,11 +47,11 @@ button.chip[aria-pressed=true] { background: var(--accent); color: var(--accent-
 button.chip small { opacity: .75; margin-left: 4px; }
 .aantal { color: var(--zacht); font-size: .85rem; margin: 10px 0 4px; }
 ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radius: 14px; padding: 12px; display: grid; grid-template-columns: 84px 1fr; gap: 12px; }
+li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radius: 14px; padding: 12px; display: grid; grid-template-columns: 84px minmax(0,1fr); gap: 12px; }
 .plaatje { width: 84px; height: 84px; border-radius: 10px; background: var(--onb-bg); display: grid; place-items: center; color: var(--zacht); font-weight: 700; font-size: 1.6rem; overflow: hidden; }
 .plaatje img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
 .titel { font-weight: 600; overflow-wrap: anywhere; }
-.meta { color: var(--zacht); font-size: .85rem; }
+.meta { color: var(--zacht); font-size: .85rem; overflow-wrap: anywhere; }
 .prijzen { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; }
 .prijs { font-size: 1.25rem; font-weight: 700; }
 .oud { color: var(--zacht); text-decoration: line-through; font-size: .9rem; }
@@ -106,10 +106,10 @@ const opslag = {
 };
 let winkelNamen = new Map();
 const toestand = {
-  winkels: new Set(opslag.lees('winkels', [])), // leeg = alle (onbekende ids worden na het laden opgeschoond)
+  winkels: new Set((() => { const w = opslag.lees('winkels', []); return Array.isArray(w) ? w.filter((x) => typeof x === 'string') : []; })()), // leeg = alle (onbekende ids worden na het laden opgeschoond)
   oordeel: opslag.lees('oordeel', ''),
   kanaal: opslag.lees('kanaal', ''),
-  familie: String(opslag.lees('familie', '')), // '' = alle families
+  familie: (() => { const f = opslag.lees('familie', ''); return typeof f === 'string' ? f : ''; })(), // '' = alle families
   sorteer: opslag.lees('sorteer', 'besparing'),
   zoek: '',
   zichtbaar: PAGINA,
@@ -204,15 +204,31 @@ function teken() {
   familieKeuze(basis);
   let l = toestand.familie ? basis.filter((a) => (a.familie || 'Overig') === toestand.familie) : basis;
   if (toestand.sorteer === 'prijs') {
-    l.sort((x, y) => (x.prijsPerEenheid ?? Infinity) - (y.prijsPerEenheid ?? Infinity) || x.titel.localeCompare(y.titel, 'nl'));
+    // Eerst per eenheid-groep (kg, l, stuk, rest), zodat stuk niet met kg/l wordt gemengd; daarbinnen laagste prijs per eenheid.
+    const groep = (a) => { const i = ['kg', 'l', 'stuk'].indexOf(a.eenheid); return i < 0 ? 3 : i; };
+    l.sort((x, y) => groep(x) - groep(y) || (x.prijsPerEenheid ?? Infinity) - (y.prijsPerEenheid ?? Infinity) || x.titel.localeCompare(y.titel, 'nl'));
   } else {
     l.sort((x, y) => (y.besparing || 0) - (x.besparing || 0) || RANG[x.oordeel] - RANG[y.oordeel] || x.titel.localeCompare(y.titel, 'nl'));
   }
   resultaat = l;
   $('aantal').textContent = laden ? '' : `${l.length} van ${DATA.aanbiedingen.length} aanbiedingen`;
   const ul = $('lijst'); ul.replaceChildren();
-  if (!l.length) ul.append(el('li', { class: 'leeg' }, laden ? 'Laden…' : DATA.aanbiedingen.length ? 'Niets gevonden met deze filters.' : 'Nog geen aanbiedingen beschikbaar.'));
+  if (!l.length) {
+    const leeg = el('li', { class: 'leeg' }, laden ? 'Laden…' : DATA.aanbiedingen.length ? 'Niets gevonden met deze filters.' : 'Nog geen aanbiedingen beschikbaar.');
+    if (!laden && DATA.aanbiedingen.length) {
+      const wis = el('button', { class: 'chip', type: 'button', style: 'display:block;margin:12px auto 0' }, 'Wis filters');
+      wis.onclick = wisFilters;
+      leeg.append(wis);
+    }
+    ul.append(leeg);
+  }
   meer(0);
+}
+function wisFilters() {
+  toestand.winkels = new Set(); toestand.oordeel = ''; toestand.kanaal = ''; toestand.familie = ''; toestand.zoek = '';
+  opslag.schrijf('winkels', []); opslag.schrijf('oordeel', ''); opslag.schrijf('kanaal', ''); opslag.schrijf('familie', '');
+  $('zoek').value = '';
+  chips(); teken();
 }
 function familieKeuze(basis) {
   const tel = new Map();

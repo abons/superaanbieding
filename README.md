@@ -28,7 +28,12 @@ node test.mjs                  # tests of the verdict logic
 ## Verdict
 
 An offer is compared per kg/l (or per piece where that makes sense) with the cheapest product (reference or other
-offer, any store) in the same narrow category, falling back to a broad product family (bread, cheese, ...). Within 5% of
-the cheapest is a good deal; otherwise the cheaper alternative is shown, marked house brand or brand, with the saving.
-"Good" needs a real comparison (at least three candidates, one from another store or brand); without one the verdict is
-"no good comparison".
+offer, any store) in the same narrow category, falling back to a broad product family (bread, cheese, ...). Verdicts:
+
+- **best**: the cheapest of the comparison, or equal to it.
+- **good**: within 5% of the cheapest.
+- **house brand cheaper** / **brand cheaper**: the cheaper alternative is shown with the saving per kg/l.
+- **unknown** ("no good comparison"): a real comparison needs at least three candidates, one from another store or brand.
+
+Online-only offers (Albert Heijn Online, Jumbo "only online") are included and can be filtered with the
+Store / online filter on the page.

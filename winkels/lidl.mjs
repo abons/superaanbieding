@@ -46,7 +46,7 @@ const r2 = n => Math.round(n * 100) / 100;
 async function zoek(q, offset, poging = 1) {
   const url = `${API}?offset=${offset}&fetchsize=${PAGINA}&locale=nl_NL&assortment=NL&version=2.1.0&category.id=${CATEGORIE_ID}&q=${encodeURIComponent(q)}`;
   try {
-    const r = await fetch(url, { headers: HEADERS });
+    const r = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return await r.json();
   } catch (e) {
@@ -177,6 +177,11 @@ async function main() {
     if (p.mechanisme || p.normaalPrijs > p.prijs) aanbiedingen.push(p);
     else { p.normaalPrijs = p.prijs; p.geldigTot = null; referentie.push(p); }
   }
+  // Te weinig aanbiedingen (0 of < 50% van het vorige bestand): niets wegschrijven.
+  let vorig = 0;
+  try { vorig = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'lidl.json'), 'utf8')).aanbiedingen.length; } catch { /* geen of kapot vorig bestand */ }
+  if (!aanbiedingen.length || aanbiedingen.length < vorig * 0.5) throw new Error(`${aanbiedingen.length} aanbiedingen (vorige run ${vorig}), structuur gewijzigd?`);
+
   const uit = { winkel: 'lidl', naam: 'Lidl', gemaakt: new Date().toISOString(), aanbiedingen, referentie };
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
   fs.mkdirSync(dir, { recursive: true });

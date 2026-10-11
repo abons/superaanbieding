@@ -11,7 +11,7 @@ supermarkt, familie en oordeel. Stand: AH, Dirk, Jumbo, Aldi, Lidl en Boon's (we
    regel in `Vocal/scripts/diensten.ps1` (rij "Superaanbieding", poort 8092, https :8445) en dagelijkse echte run van de verzamelaars.
 3. Boon's week 43 (en elke week): folder https://online.flippingbook.com/view/572493953/ lezen naar `invoer/boons-w43.json`;
    week 42 verloopt 2026-10-18.
-4. AH `100 GRAM VOOR 2.99` herkennen: `winkels/ah.mjs:98` geeft prijs 2.99 en 11,5 EUR/kg voor een kogelbiefstuk (ca. 260 g,
+4. AH `100 GRAM VOOR 2.99` herkennen: `effectievePrijs` in `winkels/ah.mjs` geeft prijs 2.99 en 11,5 EUR/kg voor een kogelbiefstuk (ca. 260 g,
    2 items) die echt 29,9 EUR/kg is.
 
 ## Openstaand

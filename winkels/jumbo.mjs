@@ -49,7 +49,7 @@ const getal = s => parseFloat(String(s).replace(',', '.'));
 
 async function zoek(input, poging = 1) {
   try {
-    const r = await fetch(URL_GQL, { method: 'POST', headers: HEADERS, body: JSON.stringify({ query: QUERY, variables: { input } }) });
+    const r = await fetch(URL_GQL, { method: 'POST', headers: HEADERS, body: JSON.stringify({ query: QUERY, variables: { input } }), signal: AbortSignal.timeout(30_000) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
     if (j.errors || !j.data) throw new Error(j.errors?.[0]?.message || 'graphql-fout');
@@ -67,6 +67,7 @@ async function alles(filters) {
   let facets = null, count = Infinity;
   for (let off = 0; off < count; off += LIMIT) {
     const d = await zoek({ searchType: 'keyword', searchTerms: '*', offSet: off, limit: LIMIT, ...(filters ? { filters } : {}) });
+    if (typeof d.count !== 'number' || !isFinite(d.count)) throw new Error('count ontbreekt in het antwoord (structuur gewijzigd?)');
     count = d.count;
     facets ||= d.facets;
     producten.push(...d.products);
@@ -173,6 +174,11 @@ async function main() {
       if (cats.has(pr.categorie)) referentie.push(pr);
     }
   }
+
+  // Te weinig aanbiedingen (0 of < 50% van het vorige bestand): niets wegschrijven.
+  let vorig = 0;
+  try { vorig = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'jumbo.json'), 'utf8')).aanbiedingen.length; } catch { /* geen of kapot vorig bestand */ }
+  if (!aanbiedingen.length || aanbiedingen.length < vorig * 0.5) throw new Error(`${aanbiedingen.length} aanbiedingen (vorige run ${vorig}), structuur gewijzigd?`);
 
   const uit = { winkel: 'jumbo', naam: 'Jumbo', gemaakt: new Date().toISOString(), aanbiedingen, referentie };
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');

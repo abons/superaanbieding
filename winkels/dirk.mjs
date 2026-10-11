@@ -37,7 +37,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function gql(query, poging = 1) {
   try {
-    const r = await fetch(GW, { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' }, body: JSON.stringify({ query }) });
+    const r = await fetch(GW, { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' }, body: JSON.stringify({ query }), signal: AbortSignal.timeout(30_000) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
     if (j.errors && !j.data) throw new Error(j.errors[0]?.message || 'graphql-fout');
@@ -139,6 +139,11 @@ async function main() {
     }
     await sleep(PAUZE);
   }
+
+  // Te weinig aanbiedingen (0 of < 50% van het vorige bestand): niets wegschrijven.
+  let vorig = 0;
+  try { vorig = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'dirk.json'), 'utf8')).aanbiedingen.length; } catch { /* geen of kapot vorig bestand */ }
+  if (!aanbiedingen.length || aanbiedingen.length < vorig * 0.5) throw new Error(`${aanbiedingen.length} aanbiedingen (vorige run ${vorig}), structuur gewijzigd?`);
 
   const uit = { winkel: 'dirk', naam: 'Dirk', gemaakt: new Date().toISOString(), aanbiedingen, referentie };
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');

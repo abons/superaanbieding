@@ -140,7 +140,7 @@ async function haal() {
   let fout;
   for (let poging = 1; poging <= 3; poging++) {
     try {
-      const r = await fetch(URL_, { headers: { 'User-Agent': UA, 'Accept-Language': 'nl-NL', 'Accept-Encoding': 'gzip' }, redirect: 'follow' });
+      const r = await fetch(URL_, { headers: { 'User-Agent': UA, 'Accept-Language': 'nl-NL', 'Accept-Encoding': 'gzip' }, redirect: 'follow', signal: AbortSignal.timeout(30_000) });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return await r.text();
     } catch (e) { fout = e; await new Promise(res => setTimeout(res, 2000 * poging)); }

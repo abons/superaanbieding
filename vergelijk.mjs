@@ -14,6 +14,12 @@ export const MIN_KANDIDATEN = 3; // zo veel vergelijkbare producten (zonder de a
 // EUR 1249 per kg', diffuser vs spray). Echte alternatieven zijn zelden meer dan 5x goedkoper: een gemiste besparing
 // is goedkoper dan een absurde.
 export const MIN_VERHOUDING = 0.2;
+// Voor de grove familie-terugval geldt een strengere grens: tussen families zitten producten die niets met elkaar te maken
+// hebben (blauwe bessen vs appeltjes, pesto vs lasagne) en die zaten precies op de 0,2-grens.
+export const MIN_VERHOUDING_FAMILIE = 0.5;
+const BRON = Symbol('bron'); // verwijzing naar het oorspronkelijke product; Symbol-sleutels komen niet in de JSON
+// Is kandidaat c de aanbieding p zelf? Op objectidentiteit, of (als er een id is) op winkel + id (de referentielijst kan hem ook bevatten).
+const isZelf = (c, winkel, p) => c[BRON] === p || (p.id != null && c.winkel === winkel && c.id === p.id);
 // Catch-all categorie: zegt niets over vergelijkbaarheid, doet alleen mee via de familie-terugval.
 const isOverig = (c) => { const t = String(c ?? '').trim().toLowerCase(); return t === '' || t === 'overig'; };
 
@@ -34,7 +40,7 @@ function genoeg(p, winkel, lijst) {
   let n = 0, anders = false;
   const m = merkVan(p, winkel);
   for (const c of lijst) {
-    if (c.winkel === winkel && c.id === p.id) continue;
+    if (isZelf(c, winkel, p)) continue;
     n++;
     if (c.winkel !== winkel || merkVan(c, c.winkel) !== m) anders = true;
   }
@@ -57,7 +63,7 @@ export function beoordeel(winkels, vandaag = vandaagNL()) {
         const fam = familieVan(p);
         if (!p.categorie && !fam) continue;
         const c = { winkel: w.winkel, id: p.id, titel: p.titel, merk: p.merk ?? null, huismerk: !!p.huismerk, online: !!p.online,
-          prijsPerEenheid: p.prijsPerEenheid, eenheid: p.eenheid, aanbieding };
+          prijsPerEenheid: p.prijsPerEenheid, eenheid: p.eenheid, aanbieding, [BRON]: p };
         if (!isOverig(p.categorie) && (p.eenheid !== 'stuk' || (fam && STUK_FAMILIES.has(fam)))) voeg(perCat, sleutel(p), c);
         if (fam && (p.eenheid !== 'stuk' || STUK_FAMILIES.has(fam))) voeg(perFam, fam + '|' + p.eenheid, c);
       }
@@ -74,11 +80,11 @@ export function beoordeel(winkels, vandaag = vandaagNL()) {
       const fam = familieVan(p);
       const basis = { ...p, winkel: w.winkel, oordeel: 'onbekend', alternatief: null, besparing: 0, familie: familieNaam(fam), vergelijking: null };
       if (p.eenheid && geldig(p.prijsPerEenheid) && (p.eenheid !== 'stuk' || (fam && STUK_FAMILIES.has(fam)))) {
-        const plausibel = (l) => (l ? l.filter((c) => c.prijsPerEenheid >= p.prijsPerEenheid * MIN_VERHOUDING) : null);
-        let lijst = isOverig(p.categorie) ? null : plausibel(perCat.get(sleutel(p))), soort = 'categorie';
-        if (!lijst || !genoeg(p, w.winkel, lijst)) { lijst = fam ? plausibel(perFam.get(fam + '|' + p.eenheid)) : null; soort = 'familie'; }
+        const plausibel = (l, grens) => (l ? l.filter((c) => c.prijsPerEenheid >= p.prijsPerEenheid * grens) : null);
+        let lijst = isOverig(p.categorie) ? null : plausibel(perCat.get(sleutel(p)), MIN_VERHOUDING), soort = 'categorie';
+        if (!lijst || !genoeg(p, w.winkel, lijst)) { lijst = fam ? plausibel(perFam.get(fam + '|' + p.eenheid), MIN_VERHOUDING_FAMILIE) : null; soort = 'familie'; }
         if (lijst && genoeg(p, w.winkel, lijst)) {
-          const alt = lijst.find((c) => !(c.winkel === w.winkel && c.id === p.id));
+          const alt = lijst.find((c) => !isZelf(c, w.winkel, p));
           basis.vergelijking = soort;
           if (p.prijsPerEenheid <= alt.prijsPerEenheid) basis.oordeel = 'beste'; // goedkoopste (of gelijk) van de vergelijking
           else if (p.prijsPerEenheid <= alt.prijsPerEenheid * (1 + DREMPEL)) basis.oordeel = 'goed';
@@ -108,8 +114,8 @@ export function leesWinkels(dir, controleerLeeftijd = true) {
       const id = String(j.winkel ?? n.slice(0, -5));
       winkels.push({ winkel: id, naam: j.naam ?? id, gemaakt: j.gemaakt ?? null, aanbiedingen: j.aanbiedingen, referentie: Array.isArray(j.referentie) ? j.referentie : [] });
       if (typeof j.waarschuwing === 'string' && j.waarschuwing) waarschuwingen.push(`${j.naam ?? id}: ${j.waarschuwing}`);
-      const leeftijd =j.gemaakt ? Date.now() - Date.parse(j.gemaakt) : NaN;
-      if (controleerLeeftijd && leeftijd > 48 * 3600e3) waarschuwingen.push(`${j.naam ?? id}: gegevens zijn ouder dan 2 dagen`);
+      const leeftijd = j.gemaakt ? Date.now() - Date.parse(j.gemaakt) : NaN;
+      if (controleerLeeftijd && !(leeftijd <= 48 * 3600e3)) waarschuwingen.push(`${j.naam ?? id}: gegevens zijn ouder dan 2 dagen of hebben geen geldige datum (gemaakt)`);
     } catch (e) { waarschuwingen.push(`${n} overgeslagen: ${e.message}`); }
   }
   return { winkels, waarschuwingen };
@@ -190,7 +196,7 @@ function main() {
   mkdirSync('data', { recursive: true });
   mkdirSync('build', { recursive: true });
   const LOCK = 'data/vergelijk.lock';
-  if (!pakLock(LOCK)) { console.log('vergelijk.mjs: een andere run is bezig (data/vergelijk.lock), overgeslagen'); return; }
+  if (!pakLock(LOCK)) { console.log('vergelijk.mjs: een andere run is bezig (data/vergelijk.lock), overgeslagen'); process.exitCode = 2; return; }
   try {
     schrijfAtomair('data/aanbiedingen.json', JSON.stringify(uit, null, 1));
     const json = JSON.stringify({ gemaakt, fixtures, fout, winkels: uit.winkels, ...inkort(aanbiedingen) });
@@ -203,7 +209,11 @@ function main() {
     }
     // Vooraf gecomprimeerd (serve.mjs levert .gz bij Accept-Encoding: gzip).
     for (const f of ['aanbiedingen.json', 'index.html', 'sw.js', 'manifest.webmanifest']) {
-      try { schrijfAtomair(join('build', f + '.gz'), gzipSync(readFileSync(join('build', f)), { level: 9 })); } catch {}
+      try { schrijfAtomair(join('build', f + '.gz'), gzipSync(readFileSync(join('build', f)), { level: 9 })); } catch (e) {
+        // Een oude .gz zou aan elke browser (die gzip meestuurt) verouderde inhoud blijven leveren: weg ermee, serve.mjs valt terug op het bestand zelf.
+        console.error(`gzip van ${f} mislukt (${e.message}), oude .gz verwijderd`);
+        try { unlinkSync(join('build', f + '.gz')); } catch {}
+      }
     }
   } finally { try { unlinkSync(LOCK); } catch {} }
   const tel = {};
