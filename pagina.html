@@ -119,6 +119,8 @@ const el = (naam, attr = {}, tekst) => {
 const $ = (id) => document.getElementById(id);
 const perEenheid = (n, e) => `${euro.format(n)} / ${EENHEID[e] || e || '?'}`;
 const norm = (s) => String(s || '').toLowerCase();
+// Zoeken op woordbegin: zonder accenten/hoofdletters, leestekens zijn woordscheiding ('Coca-Cola' = 'coca' + 'cola').
+const woorden = (s) => String(s || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const datum = (s) => { const d = new Date(s + 'T00:00:00'); return isNaN(d) ? s : d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }); };
 
 function chips() {
@@ -180,11 +182,11 @@ function kaart(a) {
 let resultaat = [], laden = true, zoekTimer = 0;
 function teken() {
   toestand.zichtbaar = PAGINA;
-  const q = norm(toestand.zoek).trim();
+  const termen = woorden(toestand.zoek).split(' ').filter(Boolean).map((t) => ' ' + t);
   let l = DATA.aanbiedingen.filter((a) =>
     (!toestand.winkels.size || toestand.winkels.has(a.winkel)) &&
     (!toestand.oordeel || a.oordeel === toestand.oordeel) &&
-    (!q || norm(a.titel + ' ' + (a.merk || '') + ' ' + (a.categorie || '')).includes(q)));
+    (!termen.length || termen.every((t) => a._z.includes(t))));
   if (toestand.sorteer === 'prijs') {
     l.sort((x, y) => (x.prijsPerEenheid ?? Infinity) - (y.prijsPerEenheid ?? Infinity) || x.titel.localeCompare(y.titel, 'nl'));
   } else {
@@ -215,6 +217,8 @@ chips(); teken();
 // De data staat apart (aanbiedingen.json); de service worker cachet hem, offline komt hij uit de cache (X-Uit-Cache).
 function tooneData(d) {
   DATA = d;
+  // Eén keer per item een genormaliseerde zoekstring (titel, merk, categorie), woorden voorafgegaan door een spatie.
+  for (const a of d.aanbiedingen) a._z = ' ' + woorden(a.titel + ' ' + (a.merk || '') + ' ' + (a.categorie || ''));
   winkelNamen = new Map((d.winkels || []).map((w) => [w.id, w.naam]));
   toestand.winkels = new Set([...toestand.winkels].filter((id) => winkelNamen.has(id)));
   laden = false;

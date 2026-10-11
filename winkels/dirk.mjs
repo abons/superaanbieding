@@ -26,8 +26,12 @@ const GW = 'https://web-gateway.dirk.nl/graphql';
 const STORE = 66;
 const PAUZE = 350; // ms tussen verzoeken
 const BASIS_IMG = 'https://web-fileserver.dirk.nl/';
+// Gecontroleerd 2026-10-11: dirk.nl "Dirk-merken" (1 de Beste, Bakker van der Akker, De Vleeschmeesters, Doornbosch, Wonderwel,
+// Natural Cool, Boterboer) en superunie.nl (g'woon, Bonbébé, Melkan, First Choice Cola, Bio+, Sum & Sam, 1 de Beste).
+// Verwijderd: Zonnatura en Grand'Italia (A-merken: AH en Jumbo verkopen ze ook als merk).
 const HUISMERKEN = new Set(['1 de beste', 'bio+', 'melkan', 'silvo', 'vleeschmeesters', 'bonbébé', 'daily chef',
-  'bits & bites', 'derlon', 'bakker van der akker', "grand'italia", 'zonnatura']);
+  'bits & bites', 'derlon', 'bakker van der akker', 'doornbosch', 'wonderwel', 'natural cool', 'boterboer',
+  'first choice cola', 'first choice', "g'woon", 'sum & sam']);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 

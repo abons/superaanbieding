@@ -35,11 +35,15 @@ const HUISMERKEN = new Set([
   'UP2FASHION', 'BISCOTTO', 'ACTIV ENERGY', 'CURRYSTAR', 'WORKZONE', 'HOME CREATION', 'HOMECREATION', 'GOLDEN SEAFOOD',
   'BARISSIMO', 'SATESSA', 'KARLSGUELL', 'SNACK FAN', 'RIDE+GO', 'KRONTALER', 'SWEETLAND', 'CROFTON', 'CASALUX',
   'LILY & DAN', 'ADVENTURIDGE', 'NOVITESSE', 'WESTMINSTER', 'ZUIVELHOEVE', "TRADER JOE'S", 'TRADER JOE’S',
-  'HALLOWEEN LEDRAAMHANGER',
+  'HALLOWEEN LEDRAAMHANGER', 'MAMA MANCINI', 'BIO', 'MAMA NATURE', "NATURE'S GIFT", // aldi.nl/producten/aldi-merken: Mama Mancini, Bio (bundelt Gut Bio/Mama Nature/Nature's Gift)
   // niet in deze week gezien maar wel Aldi-eigen
-  'MILSANI', 'MILFINA', 'MAMIA', 'GUT BIO', 'NATURE\'S PICK', 'FARMER\'S PRIDE', 'BELLAROM', 'HOUSE OF PASTA', 'SUNNY SLICE',
-  'MERIDOL', 'ALMARE', 'TASTY FRIES', 'BEST MOMENTS', 'GOLDEN CHOICE',
+  'MILSANI', 'MILFINA', 'MAMIA', 'GUT BIO', 'NATURE\'S PICK', 'FARMER\'S PRIDE', 'HOUSE OF PASTA', 'SUNNY SLICE',
+  'ALMARE', 'TASTY FRIES', 'BEST MOMENTS', 'GOLDEN CHOICE',
 ]);
+
+// Gecontroleerd 2026-10-11 en NIET Aldi-eigen: Zuivelhoeve, Canisius (A-merken: AH/Dirk/Jumbo verkopen ze als merk), Meridol
+// (Colgate), Bellarom (Lidl-merk). Ook als Aldi ze onder "ALDI merken" zet blijven ze huismerk false.
+const GEEN_HUISMERK = new Set(['ZUIVELHOEVE', 'CANISIUS', 'MERIDOL', 'BELLAROM']);
 
 // weekblokken die te algemeen zijn om als categorie te dienen
 const ALGEMENE_BLOKKEN = /^(weekacties|a-merken|weekendacties a-merken|de smaak van itali|weekend versacties|kids|vanaf)/i;
@@ -199,7 +203,7 @@ function main() {
       const h = p.hierarchicalCategories || {};
       const alleLvl = Object.values(h).flat();
       const merkRuw = (p.brandName || '').trim();
-      const huismerk = alleLvl.some(s => /^aldi merken/i.test(s)) || !merkRuw || HUISMERKEN.has(merkRuw.toUpperCase());
+      const huismerk = !GEEN_HUISMERK.has(merkRuw.toUpperCase()) && (alleLvl.some(s => /^aldi merken/i.test(s)) || !merkRuw || HUISMERKEN.has(merkRuw.toUpperCase()));
       const img = (p.assets || []).find(a => a.type === 'primary')?.url || null;
 
       aanbiedingen.push({

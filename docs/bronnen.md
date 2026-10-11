@@ -138,3 +138,15 @@ Twee routes, allebei plain fetch vanuit Node:
 2. Jumbo (open GraphQL met 2 headers, centen, `pricePerUnit` meegeleverd; ook referentie).
 3. Lidl (open zoek-API, maar inhoud/eenheidsprijs vaak zelf af te leiden uit titel/pagina).
 4. Plus (browser + CSRF/Incapsula; nu alleen via MCP of CDP).
+
+## Boon's — geen machineleesbare bron (onderzoek 2026-10-11), geen `winkels/boons.mjs`
+
+- Site is `boonsmarkt.nl` (niet boons-markt.nl: dat domein heeft een verkeerd certificaat). Vestiging Zuidland = locatie-id 26839,
+  hoort bij de folder "Boon's Markt" (niet Dagmarkt); alle ~26 Markt-vestigingen delen een landelijke folder per week
+  (`/folder`, `data-locids`, week 42 = 12-18 okt). Geen prijzen of aanbiedingen als tekst op de site (`/acties` = spaaractie).
+- De folder is een FlippingBook (`online.flippingbook.com/view/572493953/`, 24 pagina's, W42 titel "Folder-Versweken", dus
+  waarschijnlijk alleen vers): pagina's zijn afbeeldingen achter DRM-sleutels + signed CloudFront-cookies, geen tekstlaag/JSON (403).
+- Folderz (`folderz.nl/winkels/boon-s-markt/...`, folder 3841620): alleen de folderafbeeldingen; `dynamic-filters` geeft
+  `totalOffers: 0`, geen losse aanbiedingen voor de lopende week (losse offer-pagina's bestaan alleen voor oude folders, bv. 3-9 aug).
+- Geen API, geen webshop met prijzen. Alternatief: folderpagina's als afbeelding lezen (OCR/vision per week, foutgevoelig) of
+  handmatig invoeren; niet in deze tool gedaan om geen nepdata te maken.

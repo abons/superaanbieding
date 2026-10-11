@@ -101,7 +101,10 @@ function effectievePrijs(p) {
   return p.currentPrice;
 }
 
-const huismerk = (p) => /^AH( |$)/.test(p.brand || '') || /^AH /.test(p.title || '');
+// Naast "AH ..." ook de eigen merken zonder AH-voorvoegsel (ah.nl/informatie/eigen-merken, gecontroleerd 2026-10-11).
+const EIGEN_MERKEN = new Set(['perla', 'perla huisblends', 'perla superiore', 'delicata', 'care', 'de zaanse hoeve', 'brouwers',
+  'streeckgenoten', 'blue home']);
+const huismerk = (p) => /^AH( |$)/.test(p.brand || '') || /^AH /.test(p.title || '') || EIGEN_MERKEN.has((p.brand || '').toLowerCase());
 const afb = (p) => (p.images?.find((i) => i.width === 200) || p.images?.[0])?.url || null;
 
 function maakProduct(p, isAanbieding) {

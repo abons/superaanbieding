@@ -29,12 +29,14 @@ const PAUZE = 400; // ms tussen verzoeken
 const HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', 'Accept-Language': 'nl-NL' };
 
 // Lidl-eigen (huis)merken in het voedsel/drank-assortiment (kleine letters). Lijst is handmatig; nieuwe merken bijvullen.
-const HUISMERKEN = new Set(['milbona', 'pilos', 'freshona', 'cien', 'dulano', 'w5', 'mona', 'chef select', 'deluxe', 'vemondo',
-  'favorina', 'sondey', 'choceur', 'alesto', 'belbake', 'kania', 'mcennedy', 'saniku', 'nixe', 'combino', 'baresa', 'freeway',
+const HUISMERKEN = new Set(['milbona', 'pilos', 'freshona', 'cien', 'dulano', 'w5', 'chef select', 'deluxe', 'vemondo',
+  'favorina', 'sondey', 'alesto', 'bon gelati', 'formil', 'g. bellini', 'kipster', 'maribel', 'suddenly', 'belbake', 'kania', 'mcennedy', 'saniku', 'nixe', 'combino', 'baresa', 'freeway',
   'rioba', 'solevita', "vita d'or", 'fairglobe', 'bellarom', 'nutriwell', 'italiamo', 'perlenbacher', 'birkenhof', 'saphir',
   'gelatelli', 'lyttos', 'el tequito', 'snack day', 'crownfield', 'biotrend', 'primadonna', 'park street deli', 'sweet valley',
   'trattoria alfredo', 'tastino', 'eridanous', 'orlando', 'dolce vita', 'bio organic', 'lidl', 'k-take it veggie',
-  'oliveto', 'cucina nobile', 'pikok']);
+  'oliveto', 'pikok']);
+// Gecontroleerd 2026-10-11 tegen lidl.nl/c/huismerken (o.a. Alesto, Bellarom, Cien, Formil, Freeway, Milbona, Sondey, W5, Snack Day).
+// Verwijderd: Mona (A-merk, AH en Dirk verkopen het als merk), Choceur en Cucina Nobile (Aldi-merken).
 const A_MERKEN = new Set(['grolsch', 'iglo', 'bertolli', 'yakult', 'optimel', 'eru', 'hak', 'heineken', 'bavaria', 'coca-cola', 'fanta', 'sprite', 'lipton', 'douwe', 'nescafe', 'nescafé', 'unox', 'knorr', 'calve', "lay's",'doritos', 'pringles', 'milka', 'oreo']);
 const NIET_VOEDSEL = /Drogisterij|Huishouding|Dierbenodigdheden|Bloemen & planten/;
 

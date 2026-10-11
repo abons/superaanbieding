@@ -121,7 +121,7 @@ function maakProduct(p, aanbieding) {
     id: String(p.id),
     titel: (p.title || '').trim(),
     merk: brand || null,
-    huismerk: /^jumbo\b/i.test(brand),
+    huismerk: /^jumbo\b/i.test(brand) || /^jumbo\b/i.test((p.title || '').trim()), // ook "Jumbo Direct van de Boerderij" e.d. (merk Boerderij Zuivel/Merkloos)
     categorie: categorie(p),
     inhoud: p.subtitle || p.packSizeDisplay || null,
     eenheid: eh,
