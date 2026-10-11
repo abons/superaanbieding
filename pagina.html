@@ -36,9 +36,11 @@ header { padding: 16px 0 8px; display: flex; align-items: baseline; justify-cont
 h1 { margin: 0; font-size: 1.5rem; }
 .sub { color: var(--zacht); font-size: .85rem; }
 .waarsch { background: var(--waarsch-bg); color: var(--waarsch-tekst); padding: 10px 12px; border-radius: 10px; margin: 8px 0; font-size: .9rem; white-space: pre-line; }
-.bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0 10px; border-bottom: 1px solid var(--lijn); }
+.bar { background: var(--bg); padding: 8px 0 10px; border-bottom: 1px solid var(--lijn); }
 input[type=search], select { width: 100%; font: inherit; color: var(--tekst); background: var(--kaart); border: 1px solid var(--lijn); border-radius: 10px; padding: 10px 12px; }
 .rij { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rij.scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.rij.scroll button { flex: none; white-space: nowrap; }
 .rij.twee { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 button.chip { font: inherit; font-size: .9rem; color: var(--tekst); background: var(--kaart); border: 1px solid var(--lijn); border-radius: 999px; padding: 6px 12px; cursor: pointer; min-height: 36px; }
 button.chip[aria-pressed=true] { background: var(--accent); color: var(--accent-tekst); border-color: var(--accent); font-weight: 600; }
@@ -75,9 +77,8 @@ li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radiu
   <div id="fout" class="waarsch" hidden></div>
   <div class="bar">
     <input type="search" id="zoek" placeholder="Zoek op product of merk" aria-label="Zoeken" autocomplete="off">
-    <div class="rij" id="winkels" role="group" aria-label="Supermarkt"></div>
-    <div class="rij" id="kanalen" role="group" aria-label="Winkel of online"></div>
-    <div class="rij" id="oordelen" role="group" aria-label="Oordeel"></div>
+    <div class="rij scroll" id="winkels" role="group" aria-label="Supermarkt"></div>
+    <div class="rij twee"><select id="kanaal" aria-label="Winkel of online"></select><select id="oordeel" aria-label="Oordeel"></select></div>
     <div class="rij twee"><select id="familie" aria-label="Productfamilie"></select><select id="sorteer" aria-label="Sorteren">
       <option value="besparing">Sorteer: grootste besparing</option>
       <option value="prijs">Sorteer: laagste prijs per kg/l</option>
@@ -92,7 +93,7 @@ li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radiu
 const PAGINA = 60; // kaarten per keer in de DOM
 let DATA = { winkels: [], aanbiedingen: [], alternatieven: [], afbeeldingen: {} };
 
-const OORDELEN = [['', 'Alles'], ['beste', 'Beste deal'], ['goed', 'Goede deal'],['huismerk-goedkoper', 'Huismerk goedkoper'], ['merk-goedkoper', 'Merk goedkoper'], ['onbekend', 'Geen vergelijking']];
+const OORDELEN = [['', 'Alle oordelen'], ['beste', 'Beste deal'], ['goed', 'Goede deal'],['huismerk-goedkoper', 'Huismerk goedkoper'], ['merk-goedkoper', 'Merk goedkoper'], ['onbekend', 'Geen vergelijking']];
 const KANALEN = [['', 'Winkel en online'], ['winkel', 'In de winkel'], ['online', 'Alleen online']];
 const RANG ={ beste: 0, goed: 1, 'huismerk-goedkoper': 2, 'merk-goedkoper': 2, onbekend: 3 }; // bij gelijke besparing: beste deals eerst
 const BADGE = { 'beste': 'Beste deal', 'goed':'Goede deal', 'huismerk-goedkoper': 'Huismerk goedkoper', 'merk-goedkoper': 'Merk goedkoper', 'onbekend': 'Geen goede vergelijking' };
@@ -143,20 +144,16 @@ function chips() {
     };
     w.append(b);
   }
-  const k = $('kanalen'); k.replaceChildren();
   const nOnline = DATA.aanbiedingen.filter((a) => a.online).length;
-  for (const [id, naam] of KANALEN) {
-    const b = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(toestand.kanaal === id) }, naam);
-    if (id) b.append(el('small', {}, String(id === 'online' ? nOnline : DATA.aanbiedingen.length - nOnline)));
-    b.onclick = () => { toestand.kanaal = id; opslag.schrijf('kanaal', id); chips(); teken(); };
-    k.append(b);
-  }
-  const o = $('oordelen'); o.replaceChildren();
-  for (const [k, naam] of OORDELEN) {
-    const b = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(toestand.oordeel === k) }, naam);
-    b.onclick = () => { toestand.oordeel = k; opslag.schrijf('oordeel', k); chips(); teken(); };
-    o.append(b);
-  }
+  const aantal = { winkel: DATA.aanbiedingen.length - nOnline, online: nOnline };
+  $('kanaal').replaceChildren(...KANALEN.map(([id, naam]) => {
+    const o = el('option', { value: id }, id ? `${naam} (${aantal[id]})` : naam);
+    o.selected = toestand.kanaal === id; return o;
+  }));
+  $('oordeel').replaceChildren(...OORDELEN.map(([id, naam]) => {
+    const o = el('option', { value: id }, naam);
+    o.selected = toestand.oordeel === id; return o;
+  }));
 }
 
 function kaart(a) {
@@ -237,6 +234,8 @@ function meer(vanaf) {
 }
 $('meer').onclick = () => { const van = Math.min(resultaat.length, toestand.zichtbaar); toestand.zichtbaar += PAGINA; meer(van); };
 
+$('kanaal').onchange = (e) => { toestand.kanaal = e.target.value; opslag.schrijf('kanaal', toestand.kanaal); teken(); };
+$('oordeel').onchange = (e) => { toestand.oordeel = e.target.value; opslag.schrijf('oordeel', toestand.oordeel); teken(); };
 $('familie').onchange = (e) => { toestand.familie = e.target.value; opslag.schrijf('familie', toestand.familie); teken(); };
 $('sorteer').value = toestand.sorteer;
 $('sorteer').onchange = (e) => { toestand.sorteer = e.target.value; opslag.schrijf('sorteer', toestand.sorteer); teken(); };
