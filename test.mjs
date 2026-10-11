@@ -31,9 +31,7 @@ assert.equal(een([w('ah', [p()], [p()])]).oordeel, 'onbekend');
 assert.equal(een([w('ah', [p({ prijsPerEenheid: 3 })]), w('dirk', [p({ prijsPerEenheid: 1 })])], 'x').oordeel, 'merk-goedkoper');
 
 // Onbekend: geen eenheidsprijs, andere categorie, andere eenheid, of niets om mee te vergelijken.
-// Zonder gewichtsprijs (geen eenheidsprijs, of eenheid 'stuk') valt de aanbieding weg.
-assert.equal(een([w('ah', [p({ prijsPerEenheid: null })], [p({ id: 'r' })])]), undefined);
-assert.equal(een([w('ah', [p({ eenheid: 'stuk' })], [p({ id: 'r', eenheid: 'stuk', prijsPerEenheid: 0.1 })])]), undefined);
+assert.equal(een([w('ah', [p({ prijsPerEenheid: null })], [p({ id: 'r' })])]).oordeel, 'onbekend');
 assert.equal(een([w('ah', [p()], [p({ id: 'r', categorie: 'Sap', prijsPerEenheid: 0.1 })])]).oordeel, 'onbekend');
 assert.equal(een([w('ah', [p()], [p({ id: 'r', eenheid: 'kg', prijsPerEenheid: 0.1 })])]).oordeel, 'onbekend');
 assert.equal(een([w('ah', [p()])]).oordeel, 'onbekend');

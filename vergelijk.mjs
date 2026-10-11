@@ -6,7 +6,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const DREMPEL = 0.05; // binnen 5% van het goedkoopste = goed
 
-const GEWICHT = (e) => e === 'kg' || e === 'l'; // alleen prijs per kg of liter is vergelijkbaar (besluit gebruiker 2026-10-11)
 const geldig = (n) => typeof n === 'number' && Number.isFinite(n) && n > 0;
 const sleutel = (p) => `${String(p.categorie ?? '').trim().toLowerCase()}|${p.eenheid}`;
 const rond = (n) => Math.round(n * 100) / 100;
@@ -17,7 +16,7 @@ export function beoordeel(winkels) {
   for (const w of winkels) {
     for (const [lijst, aanbieding] of [[w.aanbiedingen, true], [w.referentie, false]]) {
       for (const p of lijst ?? []) {
-        if (!p || !p.categorie || !GEWICHT(p.eenheid) || !geldig(p.prijsPerEenheid)) continue;
+        if (!p || !p.categorie || !p.eenheid || !geldig(p.prijsPerEenheid)) continue;
         const k = sleutel(p);
         if (!index.has(k)) index.set(k, []);
         index.get(k).push({ winkel: w.winkel, id: p.id, titel: p.titel, merk: p.merk ?? null, huismerk: !!p.huismerk,
@@ -30,7 +29,7 @@ export function beoordeel(winkels) {
   const uit = [];
   for (const w of winkels) {
     for (const p of w.aanbiedingen ?? []) {
-      if (!p || typeof p.titel !== 'string' || !geldig(p.prijs) || !GEWICHT(p.eenheid) || !geldig(p.prijsPerEenheid)) continue; // geen gewichtsprijs = niet te beoordelen en niet getoond
+      if (!p || typeof p.titel !== 'string' || !geldig(p.prijs)) continue;
       const basis = { ...p, winkel: w.winkel, oordeel: 'onbekend', alternatief: null, besparing: 0 };
       if (p.categorie && p.eenheid && geldig(p.prijsPerEenheid)) {
         const alt = (index.get(sleutel(p)) ?? []).find((c) => !(c.winkel === w.winkel && c.id === p.id));
