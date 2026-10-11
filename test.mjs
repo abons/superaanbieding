@@ -171,4 +171,11 @@ for (const o of ['beste', 'goed','huismerk-goedkoper', 'merk-goedkoper', 'onbeke
   assert.equal(uit.aanbiedingen.filter((x) => x.online).length, 1);
 }
 
+// Een alleen-online alternatief blijft kandidaat, maar de kaart moet het kunnen tonen: online zit in het alternatief.
+{
+  const o = beoordeel([w('ah', [p({ id: 'a', titel: 'a', prijsPerEenheid: 3 })], [...refs(2, 4, 5), p({ id: 'on', titel: 'on', merk: 'X', prijsPerEenheid: 1, online: true })])]).find((x) => x.id === 'a');
+  assert.equal(o.alternatief.id, 'on'); assert.equal(o.alternatief.online, true);
+  assert.equal(inkort([o]).alternatieven[0].online, true);
+}
+
 console.log('test.mjs: alles ok');

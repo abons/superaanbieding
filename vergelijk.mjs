@@ -56,7 +56,7 @@ export function beoordeel(winkels, vandaag = vandaagNL()) {
         if (!p || !p.eenheid || !geldig(p.prijsPerEenheid)) continue;
         const fam = familieVan(p);
         if (!p.categorie && !fam) continue;
-        const c = { winkel: w.winkel, id: p.id, titel: p.titel, merk: p.merk ?? null, huismerk: !!p.huismerk,
+        const c = { winkel: w.winkel, id: p.id, titel: p.titel, merk: p.merk ?? null, huismerk: !!p.huismerk, online: !!p.online,
           prijsPerEenheid: p.prijsPerEenheid, eenheid: p.eenheid, aanbieding };
         if (!isOverig(p.categorie) && (p.eenheid !== 'stuk' || (fam && STUK_FAMILIES.has(fam)))) voeg(perCat, sleutel(p), c);
         if (fam && (p.eenheid !== 'stuk' || STUK_FAMILIES.has(fam))) voeg(perFam, fam + '|' + p.eenheid, c);
@@ -143,6 +143,7 @@ export function inkort(aanbiedingen) {
     if (alt) {
       const e = { winkel: alt.winkel, titel: alt.titel, prijsPerEenheid: alt.prijsPerEenheid };
       if (alt.huismerk) e.huismerk = true;
+      if (alt.online) e.online = true;
       const k = JSON.stringify(e);
       if (!alIdx.has(k)) { alIdx.set(k, alts.length); alts.push(e); }
       u.alternatief = alIdx.get(k);

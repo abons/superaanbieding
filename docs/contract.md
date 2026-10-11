@@ -37,7 +37,7 @@ Product:
 | `mechanisme` | string/null | "2e halve prijs", "2 voor 5,00", "25% korting" |
 | `geldigTot` | string/null | laatste dag van de aanbieding |
 | `afbeelding` | string/null | https-url |
-| `online` | boolean, optioneel | alleen in de webshop te krijgen (AH Online-actie, Jumbo "alleen online"); ontbreekt = ook in de winkel. De pagina heeft er een filter voor |
+| `online` | boolean, optioneel | alleen in de webshop te krijgen (AH Online-actie, Jumbo "alleen online"); ontbreekt = ook in de winkel. De pagina heeft er een filter voor; een online product mag wel als `alternatief` dienen, en de kaart zet dan "alleen online" erbij |
 
 Geef `prijsPerEenheid` zelf door als de winkel hem levert; zo niet, reken hem uit de inhoud. Bij meervoudsaanbiedingen
 ("2 voor 5,00") is `prijsPerEenheid` de effectieve prijs per kg/l bij afname van de actie.

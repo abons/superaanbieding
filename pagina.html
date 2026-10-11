@@ -180,7 +180,7 @@ function kaart(a) {
   const alt = DATA.alternatieven[a.alternatief];
   if (alt) {
     const altWinkel = alt.winkel || a.winkel;
-    const soort = alt.huismerk ? 'huismerk' : 'merk';
+    const soort = (alt.huismerk ? 'huismerk' : 'merk') + (alt.online ? ', alleen online' : '');
     const waar = altWinkel !== a.winkel ? ' bij ' + (winkelNamen.get(altWinkel) || altWinkel) : '';
     t.append(el('div', { class: 'alt' },
       `Goedkoper: ${alt.titel} (${soort}${waar}) ${perEenheid(alt.prijsPerEenheid, alt.eenheid || a.eenheid)}` +
