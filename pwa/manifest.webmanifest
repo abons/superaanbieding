@@ -1,8 +1,8 @@
 {
   "name": "Superaanbieding",
   "short_name": "Aanbieding",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#1f7a4d",
   "theme_color": "#1f7a4d",

@@ -1,0 +1,48 @@
+# Dagelijks: verzamelaars + samenvoegen, build/ naar GitHub Pages. Handmatig starten kan ook (bv. na nieuwe invoer/boons-*.json).
+name: publiceer
+on:
+  schedule:
+    - cron: '0 4 * * *'   # 04:00 UTC = 05:00/06:00 NL
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['invoer/**']
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  bouw:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      # data/ bewaren tussen runs: AH bouwt zijn referentiedata over meerdere runs op (request-budget 400 per run).
+      - uses: actions/cache@v4
+        with:
+          path: data
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+      - name: verzamelaars
+        run: |
+          mkdir -p data
+          for w in ah aldi boons dirk jumbo lidl; do
+            node winkels/$w.mjs || echo "::warning::$w mislukt (vorige data blijft staan)"
+          done
+      - run: node test.mjs
+      - run: node vergelijk.mjs
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: build }
+  publiceer:
+    needs: bouw
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4
