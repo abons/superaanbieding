@@ -1,4 +1,4 @@
-// Serveert build/ (de pagina als PWA) en ververst de data elk uur. Gebruik: node serve.mjs [--fixtures]
+// Serveert build/ (de pagina als PWA) en ververst de data elk uur. Gebruik: node serve.mjs [--fixtures] [--geen-ophalen]
 // Luistert alleen op localhost: later `tailscale serve --bg --https=8445 8092` voor HTTPS op het tailnet.
 // Nooit `funnel` of 0.0.0.0, want er is geen inlog.
 import { createServer } from 'node:http';
@@ -12,6 +12,7 @@ mkdirSync('data', { recursive: true });
 
 const PORT = Number(process.env.PORT) || 8092;
 const FIXTURES = process.argv.includes('--fixtures');
+const GEEN_OPHALEN = process.argv.includes('--geen-ophalen'); // alleen samenvoegen, verzamelaars niet laten lopen
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png',
   '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 
@@ -20,9 +21,14 @@ const server = createServer((req, res) => {
     const pad = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     const naam = normalize(pad === '/' ? 'index.html' : pad.slice(1));
     if (naam.startsWith('..') || naam.includes(':')) throw new Error('buiten build');
-    const inhoud = readFileSync(join('build', naam));
-    res.writeHead(200, { 'content-type': TYPES[extname(naam)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
-    res.end(inhoud);
+    const kop = { 'content-type': TYPES[extname(naam)] ?? 'application/octet-stream', 'cache-control': 'no-store', vary: 'Accept-Encoding' };
+    let inhoud;
+    if (/\bgzip\b/.test(req.headers['accept-encoding'] ?? '') && existsSync(join('build', naam + '.gz'))) {
+      inhoud = readFileSync(join('build', naam + '.gz')); kop['content-encoding'] = 'gzip';
+    } else inhoud = readFileSync(join('build', naam));
+    kop['content-length'] = inhoud.length;
+    res.writeHead(200, kop);
+    res.end(req.method === 'HEAD' ? undefined : inhoud);
   } catch {
     res.writeHead(404).end('Niet gevonden (draai eerst: node vergelijk.mjs)');
   }
@@ -50,7 +56,7 @@ const ververs = async () => {
   bezig = true;
   try {
     const fouten = [];
-    if (!FIXTURES) {
+    if (!FIXTURES && !GEEN_OPHALEN) {
       let scripts = [];
       try { scripts = readdirSync('winkels').filter((n) => n.endsWith('.mjs')).sort(); } catch {}
       for (const s of scripts) {
@@ -67,7 +73,7 @@ const ververs = async () => {
 
 // Eerst meteen samenvoegen wat er al ligt (pagina is dan direct beschikbaar), daarna de verzamelaars en elk uur opnieuw.
 (async () => {
-  if (!existsSync('build/index.html')) await draai('vergelijk.mjs', FIXTURES ? ['--fixtures'] : []);
+  if (!existsSync('build/index.html') || !existsSync('build/aanbiedingen.json.gz')) await draai('vergelijk.mjs', FIXTURES ? ['--fixtures'] : []);
   await ververs();
 })();
 setInterval(ververs, 60 * 60 * 1000);

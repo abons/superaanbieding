@@ -8,6 +8,7 @@ goede deal is, of dat een huismerk of ander merk goedkoper is per kg of liter. N
 ```
 node serve.mjs              # pagina op http://127.0.0.1:8092, ververst elk uur
 node serve.mjs --fixtures   # zelfde, maar met testdata uit fixtures/ (geen verzamelaars)
+node serve.mjs --geen-ophalen  # echte data uit data/, verzamelaars niet draaien
 node vergelijk.mjs          # alleen samenvoegen: data/*.json -> data/aanbiedingen.json + build/
 node vergelijk.mjs --fixtures
 node test.mjs               # test de oordeelslogica
@@ -16,7 +17,7 @@ node test.mjs               # test de oordeelslogica
 - `winkels/<winkel>.mjs` haalt de aanbiedingen van een winkel op en schrijft `data/<winkel>.json`
   (formaat: `docs/contract.md`). `serve.mjs` draait ze één voor één; een winkel die faalt breekt de rest niet.
   Fouten staan in `data/laatste-fout.txt` en als waarschuwing op de pagina.
-- `vergelijk.mjs` past de oordeelsregel toe en bouwt `build/` (pagina met ingebedde data, `aanbiedingen.json`, PWA-bestanden).
+- `vergelijk.mjs` past de oordeelsregel toe en bouwt `build/` (kleine pagina, compacte `aanbiedingen.json`, PWA-bestanden, plus vooraf gecomprimeerde `.gz`).
 - Alleen bereikbaar op 127.0.0.1. Voor de telefoon: `tailscale serve --bg --https=8445 8092` (nooit `funnel`).
 - Iconen opnieuw tekenen: `node pwa/maak-iconen.mjs`.
 

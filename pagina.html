@@ -83,12 +83,12 @@ li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radiu
   </div>
   <div class="aantal" id="aantal"></div>
   <ul id="lijst"></ul>
+  <div class="rij" style="justify-content:center"><button class="chip" type="button" id="meer" hidden>Toon meer</button></div>
 </main>
 <script>
 'use strict';
-const DATA = __DATA__;
-const GEMAAKT = '__GEMAAKT__';
-const FOUT = __FOUT__;
+const PAGINA = 60; // kaarten per keer in de DOM
+let DATA = { winkels: [], aanbiedingen: [], alternatieven: [], afbeeldingen: {} };
 
 const OORDELEN = [['', 'Alles'], ['goed', 'Goede deal'], ['huismerk-goedkoper', 'Huismerk goedkoper'], ['merk-goedkoper', 'Merk goedkoper'], ['onbekend', 'Onbekend']];
 const BADGE = { 'goed': 'Goede deal', 'huismerk-goedkoper': 'Huismerk goedkoper', 'merk-goedkoper': 'Merk goedkoper', 'onbekend': 'Niet te vergelijken' };
@@ -99,12 +99,13 @@ const opslag = {
   lees(k, d) { try { const v = localStorage.getItem('sa-' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   schrijf(k, v) { try { localStorage.setItem('sa-' + k, JSON.stringify(v)); } catch {} },
 };
-const winkelNamen = new Map((DATA.winkels || []).map((w) => [w.id, w.naam]));
+let winkelNamen = new Map();
 const toestand = {
-  winkels: new Set(opslag.lees('winkels', []).filter((id) => winkelNamen.has(id))), // leeg = alle
+  winkels: new Set(opslag.lees('winkels', [])), // leeg = alle (onbekende ids worden na het laden opgeschoond)
   oordeel: opslag.lees('oordeel', ''),
   sorteer: opslag.lees('sorteer', 'besparing'),
   zoek: '',
+  zichtbaar: PAGINA,
 };
 if (!OORDELEN.some(([k]) => k === toestand.oordeel)) toestand.oordeel = '';
 if (!['besparing', 'prijs'].includes(toestand.sorteer)) toestand.sorteer = 'besparing';
@@ -144,8 +145,10 @@ function chips() {
 function kaart(a) {
   const li = el('li', { class: 'kaart' });
   const plaatje = el('div', { class: 'plaatje' });
-  if (typeof a.afbeelding === 'string' && a.afbeelding.startsWith('https://')) {
-    const img = el('img', { src: a.afbeelding, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' });
+  const vn = DATA.afbeeldingen[a.winkel];
+  const bron = !a.afbeelding ? '' : a.afbeelding.startsWith('https://') ? a.afbeelding : vn ? vn.voor + a.afbeelding + vn.na : '';
+  if (bron.startsWith('https://')) {
+    const img = el('img', { src: bron, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' });
     img.onerror = () => { plaatje.replaceChildren((a.titel || '?').trim().charAt(0).toUpperCase()); };
     plaatje.append(img);
   } else plaatje.textContent = (a.titel || '?').trim().charAt(0).toUpperCase();
@@ -160,19 +163,23 @@ function kaart(a) {
   const extra = [a.mechanisme, a.geldigTot ? 't/m ' + datum(a.geldigTot) : ''].filter(Boolean).join(' · ');
   if (extra) t.append(el('div', { class: 'meta' }, extra));
   t.append(el('span', { class: 'badge ' + a.oordeel }, BADGE[a.oordeel] || a.oordeel));
-  const alt = a.alternatief;
+  const alt = DATA.alternatieven[a.alternatief];
   if (alt) {
+    const altWinkel = alt.winkel || a.winkel;
     const soort = alt.huismerk ? 'huismerk' : 'merk';
-    const waar = alt.winkel !== a.winkel ? ' bij ' + (winkelNamen.get(alt.winkel) || alt.winkel) : '';
+    const waar = altWinkel !== a.winkel ? ' bij ' + (winkelNamen.get(altWinkel) || altWinkel) : '';
     t.append(el('div', { class: 'alt' },
       `Goedkoper: ${alt.titel} (${soort}${waar}) ${perEenheid(alt.prijsPerEenheid, alt.eenheid || a.eenheid)}` +
-      ` – bespaar ${euro.format(a.besparing)} per ${EENHEID[a.eenheid] || a.eenheid}`));
+      ` – bespaar ${euro.format(a.besparing || 0)} per ${EENHEID[a.eenheid] || a.eenheid}`));
   }
   li.append(plaatje, t);
   return li;
 }
 
+// Filteren en sorteren over alle aanbiedingen; in de DOM komen er steeds maar `toestand.zichtbaar`.
+let resultaat = [], laden = true, zoekTimer = 0;
 function teken() {
+  toestand.zichtbaar = PAGINA;
   const q = norm(toestand.zoek).trim();
   let l = DATA.aanbiedingen.filter((a) =>
     (!toestand.winkels.size || toestand.winkels.has(a.winkel)) &&
@@ -181,20 +188,47 @@ function teken() {
   if (toestand.sorteer === 'prijs') {
     l.sort((x, y) => (x.prijsPerEenheid ?? Infinity) - (y.prijsPerEenheid ?? Infinity) || x.titel.localeCompare(y.titel, 'nl'));
   } else {
-    l.sort((x, y) => y.besparing - x.besparing || (x.oordeel === 'goed' ? -1 : 0) - (y.oordeel === 'goed' ? -1 : 0) || x.titel.localeCompare(y.titel, 'nl'));
+    l.sort((x, y) => (y.besparing || 0) - (x.besparing || 0) || (x.oordeel === 'goed' ? -1 : 0) - (y.oordeel === 'goed' ? -1 : 0) || x.titel.localeCompare(y.titel, 'nl'));
   }
-  $('aantal').textContent = `${l.length} van ${DATA.aanbiedingen.length} aanbiedingen`;
+  resultaat = l;
+  $('aantal').textContent = laden ? '' : `${l.length} van ${DATA.aanbiedingen.length} aanbiedingen`;
   const ul = $('lijst'); ul.replaceChildren();
-  if (!l.length) ul.append(el('li', { class: 'leeg' }, DATA.aanbiedingen.length ? 'Niets gevonden met deze filters.' : 'Nog geen aanbiedingen beschikbaar.'));
-  for (const a of l) ul.append(kaart(a));
+  if (!l.length) ul.append(el('li', { class: 'leeg' }, laden ? 'Laden…' : DATA.aanbiedingen.length ? 'Niets gevonden met deze filters.' : 'Nog geen aanbiedingen beschikbaar.'));
+  meer(0);
 }
+function meer(vanaf) {
+  const tot = Math.min(resultaat.length, toestand.zichtbaar);
+  const stuk = document.createDocumentFragment();
+  for (let i = vanaf; i < tot; i++) stuk.append(kaart(resultaat[i]));
+  $('lijst').append(stuk);
+  const rest = resultaat.length - tot;
+  $('meer').hidden = rest <= 0;
+  $('meer').textContent = `Toon meer (nog ${rest})`;
+}
+$('meer').onclick = () => { const van = Math.min(resultaat.length, toestand.zichtbaar); toestand.zichtbaar += PAGINA; meer(van); };
 
-$('gemaakt').textContent = 'bijgewerkt ' + new Date(GEMAAKT).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-if (FOUT) { $('fout').textContent = FOUT; $('fout').hidden = false; }
 $('sorteer').value = toestand.sorteer;
 $('sorteer').onchange = (e) => { toestand.sorteer = e.target.value; opslag.schrijf('sorteer', toestand.sorteer); teken(); };
-$('zoek').oninput = (e) => { toestand.zoek = e.target.value; teken(); };
+$('zoek').oninput = (e) => { toestand.zoek = e.target.value; clearTimeout(zoekTimer); zoekTimer = setTimeout(teken, 150); };
 chips(); teken();
+
+// De data staat apart (aanbiedingen.json); de service worker cachet hem, offline komt hij uit de cache (X-Uit-Cache).
+function tooneData(d) {
+  DATA = d;
+  winkelNamen = new Map((d.winkels || []).map((w) => [w.id, w.naam]));
+  toestand.winkels = new Set([...toestand.winkels].filter((id) => winkelNamen.has(id)));
+  laden = false;
+  $('gemaakt').textContent = 'bijgewerkt ' + new Date(d.gemaakt).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  if (d.fout) { $('fout').textContent = d.fout; $('fout').hidden = false; }
+  chips(); teken();
+}
+fetch('aanbiedingen.json').then((r) => {
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  if (r.headers.get('X-Uit-Cache')) $('offline').hidden = false;
+  return r.json();
+}).then(tooneData).catch((e) => {
+  laden = false; $('lijst').replaceChildren(el('li', { class: 'leeg' }, 'De aanbiedingen konden niet worden geladen (' + e.message + ').'));
+});
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});

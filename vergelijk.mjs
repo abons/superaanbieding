@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { gzipSync } from 'node:zlib';
 
 export const DREMPEL = 0.05; // binnen 5% van het goedkoopste = goed
 
@@ -67,7 +68,42 @@ export function leesWinkels(dir, controleerLeeftijd = true) {
   return { winkels, waarschuwingen };
 }
 
-const veilig = (s) => s.replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16));
+// Compacte vorm voor de pagina (build/aanbiedingen.json): alleen wat de pagina gebruikt, lege/nul/false-velden weggelaten,
+// alternatieven in een gedeelde tabel, afbeelding-urls zonder het vaste begin/einde per winkel.
+// Zie docs/contract.md. De volledige vorm blijft in data/aanbiedingen.json.
+export function inkort(aanbiedingen) {
+  const alts = [], alIdx = new Map();
+  const voorNa = {}; // per winkel: gemeenschappelijk begin (t/m laatste '/') en einde (vanaf '?') van de afbeeldings-urls
+  const perWinkel = {};
+  for (const a of aanbiedingen) if (typeof a.afbeelding === 'string' && a.afbeelding.startsWith('https://')) (perWinkel[a.winkel] ??= []).push(a.afbeelding);
+  for (const [w, urls] of Object.entries(perWinkel)) {
+    if (urls.length < 5) continue;
+    let voor = urls[0];
+    for (const u of urls) { let i = 0; while (i < voor.length && voor[i] === u[i]) i++; voor = voor.slice(0, i); }
+    voor = voor.slice(0, voor.lastIndexOf('/') + 1);
+    const na0 = urls[0].includes('?') ? urls[0].slice(urls[0].indexOf('?')) : '';
+    const na = urls.every((u) => u.endsWith(na0)) ? na0 : '';
+    if (voor || na) voorNa[w] = { voor, na };
+  }
+  const lijst = aanbiedingen.map((a) => {
+    const u = { winkel: a.winkel, titel: a.titel, prijs: a.prijs, oordeel: a.oordeel };
+    for (const k of ['merk', 'categorie', 'inhoud', 'eenheid', 'normaalPrijs', 'prijsPerEenheid', 'mechanisme', 'geldigTot', 'afbeelding', 'besparing']) {
+      if (a[k] !== null && a[k] !== undefined && a[k] !== 0 && a[k] !== '') u[k] = a[k];
+    }
+    const vn = voorNa[a.winkel];
+    if (vn && u.afbeelding && u.afbeelding.startsWith(vn.voor) && u.afbeelding.endsWith(vn.na)) u.afbeelding = u.afbeelding.slice(vn.voor.length, u.afbeelding.length - vn.na.length);
+    const alt = a.alternatief;
+    if (alt) {
+      const e = { winkel: alt.winkel, titel: alt.titel, prijsPerEenheid: alt.prijsPerEenheid };
+      if (alt.huismerk) e.huismerk = true;
+      const k = JSON.stringify(e);
+      if (!alIdx.has(k)) { alIdx.set(k, alts.length); alts.push(e); }
+      u.alternatief = alIdx.get(k);
+    }
+    return u;
+  });
+  return { aanbiedingen: lijst, alternatieven: alts, afbeeldingen: voorNa };
+}
 
 function main() {
   process.chdir(dirname(fileURLToPath(import.meta.url)));
@@ -76,8 +112,6 @@ function main() {
   const aanbiedingen = beoordeel(winkels);
   const gemaakt = new Date().toISOString();
   const uit = { gemaakt, fixtures, winkels: winkels.map((w) => ({ id: w.winkel, naam: w.naam })), aanbiedingen };
-  const json = JSON.stringify(uit);
-
   let fout = '';
   if (!fixtures) { try { fout = readFileSync('data/laatste-fout.txt', 'utf8').trim(); } catch {} }
   fout = [fout, ...waarschuwingen].filter(Boolean).join('\n');
@@ -85,13 +119,14 @@ function main() {
   mkdirSync('data', { recursive: true });
   mkdirSync('build', { recursive: true });
   writeFileSync('data/aanbiedingen.json', JSON.stringify(uit, null, 1));
+  const json = JSON.stringify({ gemaakt, fixtures, fout, winkels: uit.winkels, ...inkort(aanbiedingen) });
   writeFileSync('build/aanbiedingen.json', json);
-  const html = readFileSync('pagina.html', 'utf8')
-    .replace('__DATA__', () => veilig(json))
-    .replace('__GEMAAKT__', () => gemaakt)
-    .replace('__FOUT__', () => veilig(JSON.stringify(fout)));
-  writeFileSync('build/index.html', html);
+  copyFileSync('pagina.html', 'build/index.html');
   if (existsSync('pwa')) for (const f of readdirSync('pwa')) if (/\.(webmanifest|js|png|svg)$/.test(f) && !f.startsWith('maak')) copyFileSync(join('pwa', f), join('build', f));
+  // Vooraf gecomprimeerd (serve.mjs levert .gz bij Accept-Encoding: gzip).
+  for (const f of ['index.html', 'aanbiedingen.json', 'sw.js', 'manifest.webmanifest']) {
+    try { writeFileSync(join('build', f + '.gz'), gzipSync(readFileSync(join('build', f)), { level: 9 })); } catch {}
+  }
   const tel = {};
   for (const a of aanbiedingen) tel[a.oordeel] = (tel[a.oordeel] ?? 0) + 1;
   console.log(`${aanbiedingen.length} aanbiedingen uit ${winkels.length} winkels`, tel);

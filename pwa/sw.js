@@ -1,7 +1,7 @@
-// Netwerk eerst, cache als terugval: de pagina bevat alle data, dus offline zie je de laatst geladen stand.
+// Netwerk eerst, cache als terugval: pagina en aanbiedingen.json worden gecachet, dus offline zie je de laatst geladen stand.
 // Alleen een goed antwoord (200) gaat de cache in. Een antwoord uit de cache krijgt de header `X-Uit-Cache`,
 // zodat de pagina kan tonen dat de pc niet bereikbaar is. Het netwerk krijgt 6 s om te *beginnen* met antwoorden.
-const CACHE = 'superaanbieding-v1';
+const CACHE = 'superaanbieding-v2';
 const uitCache = async (req) => {
   const c = await caches.match(req, { ignoreSearch: true });
   if (!c) return null;

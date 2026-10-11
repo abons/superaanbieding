@@ -60,4 +60,21 @@ anders `merk-goedkoper`; `onbekend` zonder eenheidsprijs of vergelijkbaar produc
 ## Pagina
 
 `serve.mjs` serveert `build/` op 127.0.0.1:**8092** (8090 is growatt), alleen loopback; later tailscale https :8445.
-Pagina leest `aanbiedingen.json`; filter op winkel (knoppen), op oordeel, zoekveld; sorteren op besparing/prijs per kg-l.
+`index.html` is statisch en haalt `aanbiedingen.json` op (fetch); beide worden door `sw.js` gecachet. `serve.mjs` levert
+de vooraf gemaakte `.gz` als de browser gzip accepteert. Filter op winkel (knoppen, meerkeuze), op oordeel, zoekveld;
+sorteren op besparing/prijs per kg-l. De lijst toont 60 kaarten per keer ('Toon meer').
+
+### `build/aanbiedingen.json` (compacte vorm voor de pagina)
+
+`data/aanbiedingen.json` houdt de volledige vorm hierboven; `build/aanbiedingen.json` (`inkort()` in `vergelijk.mjs`) is:
+
+```json
+{ "gemaakt": "...", "fixtures": false, "fout": "waarschuwingen of ''", "winkels": [{"id":"ah","naam":"..."}],
+  "alternatieven": [ {"winkel":"ah","titel":"...","prijsPerEenheid":1.2,"huismerk":true} ],
+  "afbeeldingen": { "ah": {"voor":"https://static.ah.nl/dam/product/","na":"?revLabel=1&..."} },
+  "aanbiedingen": [ {"winkel","titel","prijs","oordeel", + alleen aanwezige: merk, categorie, inhoud, eenheid, normaalPrijs,
+    prijsPerEenheid, mechanisme, geldigTot, afbeelding, besparing, alternatief} ] }
+```
+
+`alternatief` is een index in `alternatieven`. `afbeelding` is `voor + waarde + na` als de waarde niet met `https://` begint
+(per winkel het gemeenschappelijke begin/einde eraf). Weggelaten: `id`, `huismerk`, `normaalPerEenheid`, null/0/false-velden.
