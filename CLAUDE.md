@@ -10,7 +10,7 @@ See `README.md` for use, `docs/contract.md` for the data format (the contract be
 | `vergelijk.mjs` | merges `data/*.json`, judges each offer (`beoordeel`), writes `data/aanbiedingen.json` + `build/`; `--fixtures` reads `fixtures/` |
 | `familie.mjs` | coarse product family per product (keywords on category + title), `familieNaam`, `STUK_FAMILIES` (per piece over the whole family), `STUK_CATEGORIE_FAMILIES` (per piece only within one category) |
 | `docs/bronnen.md` | research per shop (endpoints, how each shop is fetched); state 2026-10-11, the collectors live in `winkels/` |
-| `serve.mjs` | serves `build/` on 127.0.0.1:8092; runs collectors one by one, then `vergelijk.mjs`, at start and hourly; `--fixtures` skips collectors, `--geen-ophalen` skips them too but keeps real data; serves the pre-gzipped `build/*.gz` |
+| `serve.mjs` | serves `build/` on 127.0.0.1:8092; runs collectors one by one, then `vergelijk.mjs`, at start and hourly (merge hourly, each collector at most every 6 h, 2 h pause after a failure); `--fixtures` skips collectors, `--geen-ophalen` skips them too but keeps real data; serves the pre-gzipped `build/*.gz` |
 | `pagina.html` | the page (static, copied to `build/index.html`; fetches `aanbiedingen.json`, renders 60 cards at a time + 'Toon meer'), mobile first, filters in localStorage (`sa-` keys) |
 | `pwa/` | manifest, `sw.js`, icons (`maak-iconen.mjs` draws the PNGs without libs) |
 | `fixtures/` | `ah.json`, `dirk.json` test data covering most of the five verdicts |

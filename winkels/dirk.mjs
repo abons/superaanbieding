@@ -29,7 +29,7 @@ const BASIS_IMG = 'https://web-fileserver.dirk.nl/';
 // Gecontroleerd 2026-10-11: dirk.nl "Dirk-merken" (1 de Beste, Bakker van der Akker, De Vleeschmeesters, Doornbosch, Wonderwel,
 // Natural Cool, Boterboer) en superunie.nl (g'woon, Bonbébé, Melkan, First Choice Cola, Bio+, Sum & Sam, 1 de Beste).
 // Verwijderd: Zonnatura en Grand'Italia (A-merken: AH en Jumbo verkopen ze ook als merk).
-const HUISMERKEN = new Set(['1 de beste', 'bio+', 'melkan', 'silvo', 'vleeschmeesters', 'bonbébé', 'daily chef',
+const HUISMERKEN = new Set(['1 de beste', 'bio+', 'melkan', 'silvo', 'vleeschmeesters', 'bonbébé',
   'bits & bites', 'derlon', 'bakker van der akker', 'doornbosch', 'wonderwel', 'natural cool', 'boterboer',
   'first choice cola', 'first choice', "g'woon", 'sum & sam']);
 
@@ -128,9 +128,17 @@ async function main() {
   const dep = (await gql('{listDepartments{departments{id description webGroups{description webGroupId}}}}')).listDepartments.departments;
   const referentie = [];
   const refGezien = new Set();
+  const mislukt = [];
+  let teDoen = 0;
   for (const dp of dep) for (const g of dp.webGroups) {
     if (!cats.has(g.description)) continue; // alleen categorieen waarin een aanbieding zit
-    const data = await gql(`{listWebGroupProducts(webGroupId:${g.webGroupId}){productAssortment(storeId:${STORE}){productId normalPrice offerPrice productInformation{${PI}}}}}`);
+    teDoen++;
+    let data;
+    try { data = await gql(`{listWebGroupProducts(webGroupId:${g.webGroupId}){productAssortment(storeId:${STORE}){productId normalPrice offerPrice productInformation{${PI}}}}}`); } catch (e) {
+      mislukt.push(g.description); // één falende webgroep (na retries) overslaan, met waarschuwing in het bestand
+      console.error(`dirk.mjs: referentie '${g.description}' mislukt: ${e.message}`);
+      continue;
+    }
     for (const p of data?.listWebGroupProducts?.productAssortment || []) {
       if (!p || !p.productInformation || refGezien.has(p.productId) || inAanbieding.has(p.productId)) continue;
       if (p.offerPrice > 0 || !(p.normalPrice > 0)) continue;
@@ -145,7 +153,12 @@ async function main() {
   try { vorig = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'dirk.json'), 'utf8')).aanbiedingen.length; } catch { /* geen of kapot vorig bestand */ }
   if (!aanbiedingen.length || (aanbiedingen.length < vorig * 0.5 && !process.env.SA_FORCEER)) throw new Error(`${aanbiedingen.length} aanbiedingen (vorige run ${vorig}), structuur gewijzigd? (bij een echte daling: SA_FORCEER=1 of data/dirk.json weghalen)`);
 
-  const uit = { winkel: 'dirk', naam: 'Dirk', gemaakt: new Date().toISOString(), aanbiedingen, referentie };
+  // Meer dan een kwart van de webgroepen mislukt: de API is stuk, niet één groep; vorig bestand laten staan.
+  if (mislukt.length > Math.max(1, teDoen * 0.25)) throw new Error(`${mislukt.length} van ${teDoen} referentie-webgroepen mislukt`);
+
+  const uit = { winkel: 'dirk', naam: 'Dirk', gemaakt: new Date().toISOString(),
+    ...(mislukt.length ? { waarschuwing: `referentie ontbreekt voor ${mislukt.length} categorie(en): ${mislukt.slice(0, 5).join(', ')}` } : {}),
+    aanbiedingen, referentie };
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'dirk.json'), JSON.stringify(uit, null, 1));

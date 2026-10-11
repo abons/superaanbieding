@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, exis
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { familieVan, familieNaam, STUK_FAMILIES, STUK_CATEGORIE_FAMILIES } from './familie.mjs';
+import { familieVan, familieNaam, STUK_FAMILIES, STUK_CATEGORIE_FAMILIES, GEEN_TERUGVAL } from './familie.mjs';
 
 export const DREMPEL = 0.05; // binnen 5% van het goedkoopste = goed
 export const MIN_KANDIDATEN = 3; // zo veel vergelijkbare producten (zonder de aanbieding zelf) nodig voor een echte vergelijking
@@ -21,13 +21,14 @@ const BRON = Symbol('bron'); // verwijzing naar het oorspronkelijke product; Sym
 // Is kandidaat c de aanbieding p zelf? Op objectidentiteit, of (als er een id is) op winkel + id (de referentielijst kan hem ook bevatten).
 const isZelf = (c, winkel, p) => c[BRON] === p || (p.id != null && c.winkel === winkel && c.id === p.id);
 // Catch-all categorie: zegt niets over vergelijkbaarheid, doet alleen mee via de familie-terugval.
-const isOverig = (c) => { const t = String(c ?? '').trim().toLowerCase(); return t === '' || t === 'overig'; };
+const isOverig = (c) => { const t = String(c ?? '').trim().toLowerCase(); return t === '' || t === 'overig' || /^overige\b/.test(t); };
 
 const geldig = (n) => typeof n === 'number' && Number.isFinite(n) && n > 0;
 // Vandaag als jjjj-mm-dd in Nederlandse tijd (geldigTot is een datum zonder tijd).
 export const vandaagNL = () => new Date().toLocaleDateString('sv', { timeZone: 'Europe/Amsterdam' });
 // Een aanbieding telt niet meer mee als hij verlopen is (geldigTot voor vandaag) of geen aanbieding is (prijs >= normaalprijs).
-const verlopen = (p, vandaag) => typeof p.geldigTot === 'string' && p.geldigTot < vandaag;
+// Alleen een geldigTot dat met jjjj-mm-dd begint wordt vergeleken: 'dd-mm-jjjj' als string vergelijken geeft willekeurige uitkomsten.
+const verlopen = (p, vandaag) => typeof p.geldigTot === 'string' && /^\d{4}-\d{2}-\d{2}/.test(p.geldigTot) && p.geldigTot.slice(0, 10) < vandaag;
 const geenKorting = (p) => geldig(p.normaalPrijs) && p.prijs >= p.normaalPrijs;
 const sleutel = (p) => `${String(p.categorie ?? '').trim().toLowerCase()}|${p.eenheid}`;
 const stukCategorie = (fam) => !!fam && (STUK_FAMILIES.has(fam) || STUK_CATEGORIE_FAMILIES.has(fam));
@@ -83,9 +84,12 @@ export function beoordeel(winkels, vandaag = vandaagNL()) {
       if (p.eenheid && geldig(p.prijsPerEenheid) && (p.eenheid !== 'stuk' || stukCategorie(fam))) {
         const plausibel = (l, grens) => (l ? l.filter((c) => c.prijsPerEenheid >= p.prijsPerEenheid * grens) : null);
         let lijst = isOverig(p.categorie) ? null : plausibel(perCat.get(sleutel(p)), MIN_VERHOUDING), soort = 'categorie';
-        if (!lijst || !genoeg(p, w.winkel, lijst)) { lijst = fam ? plausibel(perFam.get(fam + '|' + p.eenheid), MIN_VERHOUDING_FAMILIE) : null; soort = 'familie'; }
+        if (!lijst || !genoeg(p, w.winkel, lijst)) { lijst = fam && !GEEN_TERUGVAL.has(fam) ? plausibel(perFam.get(fam + '|' + p.eenheid), MIN_VERHOUDING_FAMILIE) : null; soort = 'familie'; }
         if (lijst && genoeg(p, w.winkel, lijst)) {
-          const alt = lijst.find((c) => !isZelf(c, w.winkel, p));
+          let alt = lijst.find((c) => !isZelf(c, w.winkel, p));
+          // Een winkelaanbieding krijgt bij voorkeur een alternatief dat ook in de winkel ligt (online heeft bezorgkosten/minimum);
+          // alleen als dat er niet is (of niet goedkoper is) blijft het online alternatief, op de kaart gelabeld.
+          if (alt.online && !p.online) alt = lijst.find((c) => !c.online && !isZelf(c, w.winkel, p) && c.prijsPerEenheid < p.prijsPerEenheid) ?? alt;
           basis.vergelijking = soort;
           if (p.prijsPerEenheid <= alt.prijsPerEenheid) basis.oordeel = 'beste'; // goedkoopste (of gelijk) van de vergelijking
           else if (p.prijsPerEenheid <= alt.prijsPerEenheid * (1 + DREMPEL)) basis.oordeel = 'goed';
@@ -116,6 +120,20 @@ function normaliseerEenheden(lijst) {
   return { uit, onbekend };
 }
 
+// Contractcontrole per winkelbestand (docs/contract.md): telt producten met een `geldigTot` dat geen jjjj-mm-dd is (`verlopen()` slaat dat
+// over, dus zo'n aanbieding telt als niet verlopen) en aanbiedingen zonder titel of met een prijs die geen getal > 0 is (die vallen
+// stil weg in `beoordeel`). Alleen tellen: er wordt niets uitgesloten of aangepast.
+const DATUM = /^\d{4}-\d{2}-\d{2}$/;
+export function valideerProducten(lijst, aanbieding) {
+  let datum = 0, kaal = 0;
+  for (const p of lijst) {
+    if (!p || typeof p !== 'object') { kaal++; continue; }
+    if (p.geldigTot != null && !(typeof p.geldigTot === 'string' && DATUM.test(p.geldigTot) && !Number.isNaN(Date.parse(p.geldigTot)))) datum++;
+    if (aanbieding && (typeof p.titel !== 'string' || !geldig(p.prijs))) kaal++;
+  }
+  return { datum, kaal };
+}
+
 // Leest alle winkelbestanden in `dir`; kapotte bestanden worden overgeslagen en komen als waarschuwing terug.
 export function leesWinkels(dir, controleerLeeftijd = true) {
   const winkels = [], waarschuwingen = [];
@@ -130,6 +148,9 @@ export function leesWinkels(dir, controleerLeeftijd = true) {
       const ne = normaliseerEenheden(j.aanbiedingen), nr = normaliseerEenheden(Array.isArray(j.referentie) ? j.referentie : []);
       winkels.push({ winkel: id, naam: j.naam ?? id, gemaakt: j.gemaakt ?? null, aanbiedingen: ne.uit, referentie: nr.uit });
       if (ne.onbekend + nr.onbekend) waarschuwingen.push(`${j.naam ?? id}: ${ne.onbekend + nr.onbekend} producten met een onbekende eenheid (alleen kg, l, stuk of leeg), zonder vergelijking`);
+      const va = valideerProducten(ne.uit, true), vr = valideerProducten(nr.uit, false);
+      if (va.datum + vr.datum) waarschuwingen.push(`${j.naam ?? id}: ${va.datum + vr.datum} producten met een geldigTot in een ander formaat dan jjjj-mm-dd (de verloopcontrole slaat ze over)`);
+      if (va.kaal + vr.kaal) waarschuwingen.push(`${j.naam ?? id}: ${va.kaal + vr.kaal} producten zonder titel of met een prijs die geen getal > 0 is (genegeerd)`);
       if (typeof j.waarschuwing === 'string' && j.waarschuwing) waarschuwingen.push(`${j.naam ?? id}: ${j.waarschuwing}`);
       const leeftijd = j.gemaakt ? Date.now() - Date.parse(j.gemaakt) : NaN;
       if (controleerLeeftijd && !(leeftijd <= 48 * 3600e3)) waarschuwingen.push(`${j.naam ?? id}: gegevens zijn ouder dan 2 dagen of hebben geen geldige datum (gemaakt)`);

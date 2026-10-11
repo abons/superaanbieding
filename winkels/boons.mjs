@@ -19,9 +19,11 @@ const vandaagNL = () => new Date().toLocaleDateString('sv', { timeZone: 'Europe/
 
 // Kiest uit [{naam, inv}] de invoer met de laatste geldigTot (niet het weeknummer: dat loopt bij de jaarwisseling terug).
 // Zonder geldigTot telt een invoer als oudste.
-export function kiesInvoer(invoeren) {
+export function kiesInvoer(invoeren, vandaag = new Date().toLocaleDateString('sv', { timeZone: 'Europe/Amsterdam' })) {
   if (!invoeren.length) throw new Error('geen invoer/boons-w*.json gevonden');
-  return invoeren.slice().sort((a, b) => String(b.inv.geldigTot || '').localeCompare(String(a.inv.geldigTot || '')) || b.naam.localeCompare(a.naam))[0];
+  // Een week die nog niet is begonnen (geldigVan in de toekomst) mag vooraf worden ingevoerd zonder de lopende week te verdringen.
+  const begonnen = invoeren.filter((i) => !i.inv.geldigVan || String(i.inv.geldigVan) <= vandaag);
+  return (begonnen.length ? begonnen : invoeren).slice().sort((a, b) => String(b.inv.geldigTot || '').localeCompare(String(a.inv.geldigTot || '')) || b.naam.localeCompare(a.naam))[0];
 }
 
 function nieuwsteInvoer() {

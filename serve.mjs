@@ -1,4 +1,4 @@
-// Serveert build/ (de pagina als PWA) en ververst de data elk uur. Gebruik: node serve.mjs [--fixtures] [--geen-ophalen]
+// Serveert build/ (de pagina als PWA) en voegt de data elk uur samen (de verzamelaars lopen hoogstens elke SA_VERS_UUR=6 uur). Gebruik: node serve.mjs [--fixtures] [--geen-ophalen]
 // Luistert alleen op localhost: later `tailscale serve --bg --https=8445 8092` voor HTTPS op het tailnet.
 // Nooit `funnel` of 0.0.0.0, want er is geen inlog.
 import { createServer } from 'node:http';
@@ -52,6 +52,9 @@ const draai = (script, args = []) => new Promise((klaar) => {
   kind.on('exit', (code) => { clearTimeout(timer); klaar(code === 0 ? null : `afgesloten met code ${code}`); });
 });
 
+const VERS_UUR = process.env.SA_VERS_UUR == null ? 6 : Number(process.env.SA_VERS_UUR);
+const FOUT_UUR = 2;
+const nietVoor = new Map(); // verzamelaar -> tijdstip waarvoor hij na een fout niet opnieuw loopt
 let bezig = false;
 const ververs = async () => {
   if (bezig) return;
@@ -62,8 +65,15 @@ const ververs = async () => {
       let scripts = [];
       try { scripts = readdirSync('winkels').filter((n) => n.endsWith('.mjs')).sort(); } catch {}
       for (const s of scripts) {
+        // Aanbiedingen wisselen per dag/week: een verzamelaar loopt hoogstens elke VERS_UUR uur (standaard 6) en na een
+        // fout pas na FOUT_UUR uur weer (zo ook bij 429: geen hamerende uurlijkse herhaling). Env SA_VERS_UUR=0 = altijd.
+        const bestand = join('data', s.replace(/\.mjs$/, '.json'));
+        let leeftijd = Infinity;
+        try { leeftijd = Date.now() - statSync(bestand).mtimeMs; } catch {}
+        if (Date.now() < (nietVoor.get(s) ?? 0)) { fouten.push(`${s}: vorige run faalde, wacht tot ${new Date(nietVoor.get(s)).toISOString()}`); continue; }
+        if (leeftijd < VERS_UUR * 3600e3) continue;
         const f = await draai(join('winkels', s)); // een winkel die faalt breekt de rest niet
-        if (f) fouten.push(`${s}: ${f}`);
+        if (f) { fouten.push(`${s}: ${f}`); nietVoor.set(s, Date.now() + FOUT_UUR * 3600e3); } else nietVoor.delete(s);
       }
     }
     if (fouten.length) writeFileSync('data/laatste-fout.txt', `${new Date().toISOString()}\n${fouten.join('\n')}\n`);

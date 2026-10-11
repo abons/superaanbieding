@@ -31,13 +31,17 @@ Product:
 | `inhoud` | string/null | zoals de winkel het toont ("12 x 0,33 l") |
 | `eenheid` | `"kg"` / `"l"` / `"stuk"` / null | waarop `prijsPerEenheid` slaat |
 | `prijs` | number | huidige prijs voor de verpakking (aanbiedingsprijs bij een aanbieding) |
-| `normaalPrijs` | number/null | prijs zonder aanbieding |
+| `normaalPrijs` | number/null | prijs zonder aanbieding; null als de winkel hem niet geeft (Aldi op=op, Boon's folder, AH BONUS: 256 van 11537 op 2026-10-11): zo'n aanbieding blijft staan en wordt gewoon beoordeeld, alleen zonder doorgestreepte prijs op de kaart; zie `docs/besluiten/zonder-normaalprijs.md` |
 | `prijsPerEenheid` | number/null | euro per kg of l bij `prijs`; null als niet te bepalen |
 | `normaalPerEenheid` | number/null | euro per kg of l zonder aanbieding |
 | `mechanisme` | string/null | "2e halve prijs", "2 voor 5,00", "25% korting" |
 | `geldigTot` | string/null | laatste dag van de aanbieding |
 | `afbeelding` | string/null | https-url |
-| `online` | boolean, optioneel | alleen in de webshop te krijgen (AH Online-actie, Jumbo "alleen online"); ontbreekt = ook in de winkel. De pagina heeft er een filter voor; een online product mag wel als `alternatief` dienen, en de kaart zet dan "alleen online" erbij |
+| `online` | boolean, optioneel | alleen in de webshop te krijgen (AH Online-actie, Jumbo "alleen online"); ontbreekt = ook in de winkel. De pagina heeft er een filter voor; een online product mag als `alternatief` dienen, en de kaart zet dan "alleen online" erbij; bij een winkelaanbieding pas als er geen goedkoper winkelalternatief is |
+
+`vergelijk.mjs` controleert dit bij het inlezen (`valideerProducten`) en geeft per winkel een waarschuwing (niets wordt uitgesloten of
+aangepast): `geldigTot` dat niet de vorm `jjjj-mm-dd` heeft (de verloopcontrole slaat zo'n aanbieding over, dus hij telt als niet verlopen; `pagina.html` doet hetzelfde), en aanbiedingen zonder `titel` of met
+een `prijs` die geen getal > 0 is (die worden genegeerd).
 
 Geef `prijsPerEenheid` zelf door als de winkel hem levert; zo niet, reken hem uit de inhoud. Bij meervoudsaanbiedingen
 ("2 voor 5,00") is `prijsPerEenheid` de effectieve prijs per kg/l bij afname van de actie.
@@ -60,7 +64,11 @@ Regel (`beoordeel` in `vergelijk.mjs`, families in `familie.mjs`): vergelijk `pr
 2. Kandidaten = referentie + alle aanbiedingen (alle winkels, behalve de aanbieding zelf: uitgesloten op objectidentiteit, of op
    winkel + `id` als die er is, want de referentielijst kan hem ook bevatten). Niet mee tellen: verlopen aanbiedingen
    (`geldigTot` < vandaag, Nederlandse tijd) en aanbiedingen met `prijs` >= `normaalPrijs` (geen echte korting); die krijgen zelf ook geen oordeel.
-   Eerste keus: dezelfde winkelcategorie; categorie leeg of 'Overig' doet alleen via de familie mee.
+   Eerste keus: dezelfde winkelcategorie; categorie leeg, 'Overig' of 'Overige ...' doet alleen via de familie mee.
+   De familie-terugval staat uit voor families in `GEEN_TERUGVAL` (`familie.mjs`, nu alleen kruiden: kervel tegen zwarte peper gaf onzin).
+   Een collector slaat één falende referentie-categorie over (waarschuwing in het bestand) maar faalt bij meer dan max(1, 25%) mislukte
+   categorieën (Jumbo: 10%, een hoofdcategorie is een heel schap), zodat het vorige bestand blijft staan.
+   `pagina.html` laat uit een oude cache aanbiedingen met `geldigTot` < vandaag weg en meldt dat in de offline-balk.
    **Plausibiliteitsgrens** (`MIN_VERHOUDING` 0,2 voor categorie, `MIN_VERHOUDING_FAMILIE` 0,5 voor familie): een kandidaat met
    `prijsPerEenheid` < grens x die van de aanbieding wordt genegeerd (verkeerd ingedeeld of gemeten; zie `docs/besluiten/plausibiliteitsgrens.md`).
    Alleen als daar niet **genoeg** is (>= 3 kandidaten en minstens een van een andere winkel of een ander merk; alle huismerken
@@ -71,6 +79,7 @@ Regel (`beoordeel` in `vergelijk.mjs`, families in `familie.mjs`): vergelijk `pr
    vergelijking', `vergelijking: null`) zonder eenheidsprijs of zonder genoeg vergelijking; `beste` en `goed` hebben nooit een alternatief.
 4. Eenheid `stuk` wordt alleen vergeleken waar dat zinvol is: over de hele familie bij brood, broodjes en eieren, en bij groente en fruit
    alleen binnen dezelfde winkelcategorie (ananas is geen banaan); een half brood is een eigen familie.
+   Brood per kg (Dirk 500 g, Boons ca. 600 g) en per stuk (gewicht onbekend, 400-800 g) worden bewust niet omgerekend naar elkaar (besluit 2026-10-11): een aangenomen standaardgewicht zou een verzonnen prijs per kg geven.
    `eenheid` wordt bij het inlezen rechtgezet (KG, ltr, liter, stuks); elke andere waarde wordt `null` met een waarschuwing. Verder gaat het om gewichtprijs (kg/l); per stuk zonder zinvolle familie is `onbekend`.
 
 `familie` (nette naam, bv. "Brood", "Overig") en `vergelijking` staan in de volledige vorm; `familie` ook in de compacte vorm.

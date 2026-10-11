@@ -260,6 +260,21 @@ chips(); teken();
 
 // De data staat apart (aanbiedingen.json); de service worker cachet hem, offline komt hij uit de cache (X-Uit-Cache).
 function tooneData(d) {
+  // Data uit de cache kan oud zijn: aanbiedingen met geldigTot voor vandaag (Nederlandse tijd) vallen weg, en is de stand
+  // meer dan 24 uur oud dan zegt de balk dat. De oordelen blijven die van het moment van maken.
+  const vandaag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' });
+  const aantal = d.aanbiedingen.length;
+  // Zelfde regel als vergelijk.mjs: alleen een geldigTot dat met jjjj-mm-dd begint wordt vergeleken.
+  d.aanbiedingen = d.aanbiedingen.filter((a) => !(typeof a.geldigTot === 'string' && /^\d{4}-\d{2}-\d{2}/.test(a.geldigTot) && a.geldigTot.slice(0, 10) < vandaag));
+  const weg = aantal - d.aanbiedingen.length;
+  const uren = d.gemaakt ? (Date.now() - new Date(d.gemaakt).getTime()) / 36e5 : NaN;
+  const leeftijd = Number.isFinite(uren) ? Math.round(uren) + ' uur oud' : 'leeftijd onbekend';
+  if (weg > 0 || !(uren <= 24)) {
+    const o = $('offline');
+    o.textContent = (o.hidden ? 'Deze stand is ' + leeftijd : o.textContent.replace(/\.$/, '') + ' (' + leeftijd + ')') +
+      (weg > 0 ? '; ' + weg + ' verlopen aanbiedingen zijn weggelaten.' : '.');
+    o.hidden = false;
+  }
   DATA = d;
   // Eén keer per item een genormaliseerde zoekstring (titel, merk, categorie), woorden voorafgegaan door een spatie.
   for (const a of d.aanbiedingen) a._z = ' ' + woorden(a.titel + ' ' + (a.merk || '') + ' ' + (a.categorie || ''));

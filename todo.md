@@ -5,25 +5,22 @@ supermarkt, familie en oordeel. Stand: AH, Dirk, Jumbo, Aldi, Lidl en Boon's (we
 
 ## Hier begint de volgende sessie
 
-1. Hoge besparingen die blijven staan (vanillestokje 1000/kg, diffuser 220/l, bieslook 208): categorie/familie te breed, geen drempelprobleem;
-   `MIN_VERHOUDING` in `vergelijk.mjs` is 0,2 (categorie) en `MIN_VERHOUDING_FAMILIE` 0,5 (sinds 2026-10-11). Opnieuw meten of er nog zulke gevallen zijn;
-   zo ja smaller indelen in `familie.mjs` of een bovengrens op besparing overwegen.
-2. Automatisch verversen: server start nu handmatig (`node serve.mjs --geen-ophalen`) en draait niet mee na een pc-herstart;
-   regel in `Vocal/scripts/diensten.ps1` (rij "Superaanbieding", poort 8092, https :8445) en dagelijkse echte run van de verzamelaars.
-3. Boon's week 43 (en elke week): folder https://online.flippingbook.com/view/572493953/ lezen naar `invoer/boons-w43.json`;
-   week 42 verloopt 2026-10-18.
-4. AH `100 GRAM VOOR 2.99` herkennen: `effectievePrijs` in `winkels/ah.mjs` geeft prijs 2.99 en 11,5 EUR/kg voor een kogelbiefstuk (ca. 260 g,
-   2 items) die echt 29,9 EUR/kg is.
+1. `Vocal/scripts/diensten.ps1` heeft sinds 2026-10-11 de rij "Superaanbieding" (8092, :8445, start zonder `--geen-ophalen`: echte run bij start, daarna samenvoegen elk uur en verzamelaars hoogstens elke 6 uur); nog niet gedraaid en ongecommit in Vocal. Controleren na `diensten.ps1 -Actie herstart` en de bestaande taak bij inloggen (die roept `herstart` aan). `scripts/status-widget.ps1` heeft geen rij voor Superaanbieding (bewust?); `Stop-Alles` herkent 8092 aan `serve\.mjs`, net als growatt.
+2. Boon's week 43 (en elke week), doen vanaf donderdag 2026-10-15 (een nieuwe folder verschijnt ongeveer donderdag voor de nieuwe week; W43 bestond op 2026-10-11 nog niet; nooit data verzinnen): nieuwe folder
+   zoeken via `boonsmarkt.nl/folder` (locatie 26839); de FlippingBook-link `.../view/572493953/` is de **W42**-folder, W43 krijgt een andere id.
+   Pagina's lezen naar `invoer/boons-w43.json` (formaat in kop van `winkels/boons.mjs`, voorbeeld `invoer/boons-w42.json`, geldigVan 2026-10-19,
+   geldigTot 2026-10-25). `kiesInvoer` kiest sinds 2026-10-11 geen week met `geldigVan` in de toekomst, dus W43 mag vooraf klaar staan. Week 42 verloopt 2026-10-18; daarna toont de tool geen Boon's meer tot de nieuwe invoer er is.
 
 ## Openstaand
 
-- Twijfelpunten uit de reviewronde van 2026-10-11 (6 reviewers, geen unanieme stem) beslissen: A4 familie in de vergelijkingssleutel (`vergelijk.mjs` `sleutel`), A7 aanbiedingen zonder `normaalPrijs` (256 stuks) filteren of alleen documenteren, B5 één falende referentie-aanvraag laten falen of doorgaan (ah/jumbo/dirk), C7/D4 verlopen of stale data tonen bij offline gebruik (`pagina.html`, `pwa/sw.js`), D7/D8 ToS-risico vastleggen in `docs/bronnen.md` en verversfrequentie/backoff op 429 (`serve.mjs`), E7 contractvalidatie-test, plus een waarschuwing voor `geldigTot` in een ander formaat dan jjjj-mm-dd (`verlopen()` in `vergelijk.mjs` laat dat stil door).
-- `haalToken` in `winkels/ah.mjs` valt niet onder de retry-lus van `zoek`: één time-out van 30 s op de tokenfetch stopt de hele AH-run.
-- Online-multipacks (4164 AH-aanbiedingen, "4-pack", "volume voordeel") hebben geen prijs per kg/l en zijn "Geen vergelijking": eenheidsprijs uit het basisproduct afleiden of weglaten (`winkels/ah.mjs`, `maakProduct`).
-- Beslissen of een alleen-online product het alternatief van een winkelproduct mag zijn (nu wel, kaart zegt "alleen online"; `vergelijk.mjs`, `beoordeel`); zie `docs/besluiten/beste-en-online.md`.
-
-- Plus ontbreekt (bot-bescherming, alleen via browser); onderzoek in `docs/bronnen.md`.
+- Sorteren op grootste besparing zet kleine verpakkingen bovenaan (vanillestokje 318/kg = 0,64 per zakje): sorteren/tonen op besparing per verpakking (`besparing * prijs / prijsPerEenheid`; `pagina.html` sorteer-optie en kaarttekst, `docs/contract.md`, `test.mjs`).
+- Kruiden hebben sinds 2026-10-11 geen familie-terugval meer (`GEEN_TERUGVAL` in `familie.mjs`); eventueel splitsen in enkel kruid, kruidenmix en zout/Aromat/vetsin. Grabbel-categorieën 'Overige ...' tellen niet meer als categorie-vergelijking.
+- Deelfamilies (2026-10-11, `familie.mjs`) zijn nog grof: Knorr-sauzen tegenover pastasaus, plantaardige plakken en `kaas-snack`-regels (gewone `blokjes` zijn dichter bij plakken dan bij hapjes) niet op echte data nagelopen; steekproeven op `vergelijking: "familie"` herhalen, na een verse `node vergelijk.mjs`.
+- Boon's-aanbiedingen zonder `normaalPrijs` én zonder mechanisme zijn niet te onderscheiden van een gewone prijs en kunnen toch `beste`/`huismerk-goedkoper` krijgen (`docs/besluiten/zonder-normaalprijs.md`): filteren op mechanisme of per winkel overwegen.
+- Een mislukte referentie-categorie geeft een waarschuwing, maar `vergelijk.mjs` weet niet welke ontbreekt (vals `beste`/`goed` mogelijk); producten uit het vorige `data/<winkel>.json` hergebruiken is de betere oplossing.
+- `nietVoor` (foutpauze in `serve.mjs`) staat alleen in het geheugen: na een herstart wordt een winkel die op 429 zit meteen opnieuw geraakt; persisteren in `data/`.
+- Online-multipacks: "N flessen" wijn zonder volume-voordeel blijft `stuk`; N x 0,75 l overwegen. 45 groente/fruit-aanbiedingen met "N-pack" verloren hun stukprijs (pakmaat onbekend).
+- Plus ontbreekt bewust (besluit 2026-10-11, `docs/bronnen.md`); nog niet onderzocht: folder-aggregators (folderz.nl) voor Plus. Heroverwegen bij een open feed of toestemming.
 - Mobiele layout (390 px) niet op een echte telefoon bekeken; filterrij controleren op de Motorola.
-- Huismerklijsten Dirk (Silvo, Daily Chef, Bits & Bites, Derlon) en Aldi/Lidl deels onbevestigd.
-- Families te grof (kip, kaas, sauzen, toetjes): alternatief kan goedkoper maar niet gelijkwaardig zijn.
-- Brood per stuk tegenover per kg (Dirk Polders): geen gewicht per brood in de data.
+- Huismerklijsten Dirk (Silvo, Bits & Bites, Derlon) niet online te bevestigen (dirk.nl/dirk-merken noemt ze niet; 2026-10-11 bewust behouden: alleen bij Dirk in data); Daily Chef is een gedeeld merk en sinds 2026-10-11 geen huismerk meer; Aldi/Lidl deels onbevestigd.
+- `data/ah.json` is op 2026-10-11 ververst met de nieuwe logica (100-gram-voor, multipacks); Boon's/Jumbo/Dirk nog niet.

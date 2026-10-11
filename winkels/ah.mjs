@@ -12,7 +12,7 @@
 //
 // Gebruik: node winkels/ah.mjs        (env MAX_REQ = maximaal aantal requests, standaard 400; PAUZE = ms, standaard 220)
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const BASIS = 'https://api.ah.nl';
@@ -26,14 +26,27 @@ let requests = 0;
 const slaap = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function haalToken() {
-  const r = await fetch(`${BASIS}/mobile-auth/v1/auth/token/anonymous`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'User-Agent': UA, 'X-Application': 'AHWEBSHOP' },
-    body: JSON.stringify({ clientId: 'appie' }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!r.ok) throw new Error(`token ${r.status}`);
-  token = (await r.json()).access_token;
+  let fout;
+  for (let poging = 0; poging < 3; poging++) {
+    if (poging > 0) await slaap(2000 * poging);
+    let r;
+    try {
+      r = await fetch(`${BASIS}/mobile-auth/v1/auth/token/anonymous`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': UA, 'X-Application': 'AHWEBSHOP' },
+        body: JSON.stringify({ clientId: 'appie' }),
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (e) { fout = e; continue; } // netwerkfout of time-out: opnieuw
+    if (r.status === 429 || r.status >= 500) { fout = new Error(`token ${r.status}`); continue; }
+    if (!r.ok) throw new Error(`token ${r.status}`); // andere 4xx: niet herhalen
+    try {
+      const t = (await r.json()).access_token;
+      if (!t) { fout = new Error('token zonder access_token'); continue; }
+      token = t; return;
+    } catch (e) { fout = e; }
+  }
+  throw fout;
 }
 
 class Budget extends Error {}
@@ -113,23 +126,57 @@ const EIGEN_MERKEN = new Set(['perla', 'perla huisblends', 'perla superiore', 'd
 const huismerk = (p) => /^AH( |$)/.test(p.brand || '') || /^AH /.test(p.title || '') || EIGEN_MERKEN.has((p.brand || '').toLowerCase());
 const afb = (p) => (p.images?.find((i) => i.width === 200) || p.images?.[0])?.url || null;
 
-function maakProduct(p, isAanbieding) {
+// "100 GRAM VOOR 2.99" = prijs per 100 g (niet per verpakking): per kg = 2.99 * 1000 / 100.
+function gramVoor(mech) {
+  const m = (mech || '').trim().match(/^(\d+) gram voor ([\d.,]+)/i);
+  return m && Number(m[1]) > 0 ? getal(m[2]) * 1000 / Number(m[1]) : null;
+}
+
+// AH Online-multipack ("Cola 4-pack", "1.5L 3-pack", "10% volume voordeel"): salesUnitSize is dan alleen het aantal
+// ("4 stuks" / "per pakket"), geen inhoud. 'stuk' zou een fout stukprijs geven. Maat in de titel ("1.5L 4-pack",
+// "2x135ml 3-pack") -> kg/l over het hele pakket; anders { eenheid: null }: geen eenheidsprijs. Geen multipack: null.
+const PAK_TITEL = /(\d+)[- ]?(?:pack|pakket|pck|pk)\b/i;
+function multipack(p, inh) {
+  const titel = p.title || '';
+  const pak = titel.match(PAK_TITEL);
+  const volume = /volume voordeel/i.test(p.bonusMechanism || '');
+  if (inh.eenheid !== 'stuk' || !(pak || volume) || p.promotionType !== 'AHONLINE') return null;
+  const m = titel.match(/(?:(\d+) ?x ?)?(\d+(?:[.,]\d+)?) ?(kg|gr|g|l|cl|ml)\b/i);
+  const n = pak ? Number(pak[1]) : 0;
+  if (!m || n < 1) return { eenheid: null };
+  const f = { kg: ['kg', 1], gr: ['kg', 0.001], g: ['kg', 0.001], l: ['l', 1], cl: ['l', 0.01], ml: ['l', 0.001] }[m[3].toLowerCase()];
+  return { eenheid: f[0], hoeveelheid: n * (m[1] ? Number(m[1]) : 1) * getal(m[2]) * f[1] };
+}
+
+export function maakProduct(p, isAanbieding) {
   const inh = parseInhoud(p.salesUnitSize);
   const normaal = p.priceBeforeBonus ?? null;
+  const perKg = isAanbieding ? gramVoor(p.bonusMechanism) : null;
+  if (perKg != null && !(inh && inh.eenheid === 'kg' && inh.hoeveelheid > 0)) return null; // gewicht onbekend: prijs niet te bepalen
   let prijs = normaal;
-  if (isAanbieding) prijs = effectievePrijs(p);
+  if (perKg != null) prijs = perKg * inh.hoeveelheid; // gewicht is bij 'ca.' een benadering
+  else if (isAanbieding) prijs = effectievePrijs(p);
   if (prijs == null) return null;
   prijs = rond(prijs);
   const ud = parseEenheidsPrijs(p.unitPriceDescription);
   let eenheid = null, pe = null, ne = null;
-  if (ud && normaal > 0) {
+  if (perKg != null) {
+    eenheid = 'kg';
+    pe = perKg;
+    ne = ud && ud.eenheid === 'kg' ? ud.prijs : normaal != null ? normaal / inh.hoeveelheid : null;
+  } else if (ud && normaal > 0) {
     eenheid = ud.eenheid;
     ne = ud.prijs;
     pe = ud.prijs * prijs / normaal;
   } else if (inh && inh.hoeveelheid > 0) {
-    eenheid = inh.eenheid;
-    pe = prijs / inh.hoeveelheid;
-    ne = normaal != null ? normaal / inh.hoeveelheid : null;
+    const mp = multipack(p, inh);
+    if (mp) { // virtueel pakket: de inhoud per stuk staat alleen in de titel, of is onbekend
+      if (mp.eenheid) { eenheid = mp.eenheid; pe = prijs / mp.hoeveelheid; ne = normaal != null ? normaal / mp.hoeveelheid : null; }
+    } else {
+      eenheid = inh.eenheid;
+      pe = prijs / inh.hoeveelheid;
+      ne = normaal != null ? normaal / inh.hoeveelheid : null;
+    }
   }
   const o = {
     id: String(p.webshopId),
@@ -274,6 +321,7 @@ async function main() {
     .filter((n) => !cache[n] || Date.parse(cache[n].gehaald) < grens)
     .sort((a, b) => (cache[a] ? Date.parse(cache[a].gehaald) : 0) - (cache[b] ? Date.parse(cache[b].gehaald) : 0));
   let gehaald = 0;
+  const mislukt = [];
   if (!afgebroken) {
     for (const naam of teDoen) {
       try {
@@ -281,12 +329,19 @@ async function main() {
         gehaald++;
       } catch (e) {
         if (e instanceof Budget) { afgebroken = e.message; break; }
-        throw e;
+        mislukt.push(naam); // één falende categorie (na retries) slaan we over; de cache houdt de oude of vult later aan
+        console.error(`ah.mjs: referentie '${naam}' mislukt: ${e.message}`);
       }
     }
   }
   await mkdir(path.dirname(UIT), { recursive: true });
   await writeFile(CACHE, JSON.stringify(cache));
+  // Meer dan een kwart van de categorieen mislukt: de API is stuk, niet één categorie; het vorige ah.json blijft staan.
+  // Noemer is wat echt geprobeerd is: na een budgetafbreking zijn de rest nooit aangeraakt.
+  if (mislukt.length > Math.max(1, (gehaald + mislukt.length) * 0.25)) {
+    console.error(`ah.mjs: ${mislukt.length} van ${gehaald + mislukt.length} geprobeerde referentie-categorieen mislukt; data/ah.json niet overschreven`);
+    process.exit(1);
+  }
   const referentie = cats.flatMap((n) => cache[n]?.producten || []);
   const zonderRef = cats.filter((n) => !cache[n]).length;
 
@@ -294,7 +349,9 @@ async function main() {
     winkel: 'ah',
     naam: 'Albert Heijn',
     gemaakt: new Date().toISOString(),
-    ...(afgebroken ? { waarschuwing: `request-budget op (${afgebroken}): gedeeltelijke lijst` } : {}),
+    ...(afgebroken || mislukt.length
+      ? { waarschuwing: [afgebroken && `request-budget op (${afgebroken}): gedeeltelijke lijst`, mislukt.length && `referentie ontbreekt voor ${mislukt.length} categorie(en): ${mislukt.slice(0, 5).join(', ')}`].filter(Boolean).join('; ') }
+      : {}),
     aanbiedingen,
     referentie,
   };
@@ -309,4 +366,4 @@ async function main() {
   );
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch((e) => { console.error(e); process.exit(1); });

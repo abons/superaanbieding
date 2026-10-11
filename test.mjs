@@ -4,9 +4,10 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beoordeel, inkort, leesWinkels, pakLock, LOCK_STALE_MS, MIN_VERHOUDING, MIN_VERHOUDING_FAMILIE, normEenheid } from './vergelijk.mjs';
+import { beoordeel, inkort, leesWinkels, pakLock, LOCK_STALE_MS, MIN_VERHOUDING, MIN_VERHOUDING_FAMILIE, normEenheid, valideerProducten } from './vergelijk.mjs';
 import { kiesInvoer } from './winkels/boons.mjs';
 import { isGratisCadeauZonderKorting } from './winkels/jumbo.mjs';
+import { maakProduct as maakAhProduct } from './winkels/ah.mjs';
 import { familieVan, familieNaam } from './familie.mjs';
 
 const p = (o) => ({ id: 'x', titel: 't', merk: null, huismerk: false, categorie: 'Cola', eenheid: 'l', prijs: 1, prijsPerEenheid: 1, ...o });
@@ -85,10 +86,17 @@ a = beoordeel([w('ah', [p({ prijsPerEenheid: 3 }), mx('oud', '2026-10-10', { pri
 assert.equal(a.alternatief.id, 'n1');
 // Prijs >= normaalprijs is geen aanbieding (ook niet als alternatief).
 assert.deepEqual(beoordeel([w('ah', [mx('gelijk', null, { prijs: 2, normaalPrijs: 2 }), mx('goed', null, { prijs: 1, normaalPrijs: 2 })])]).map((x) => x.id), ['goed']);
+// Zonder normaalPrijs (Aldi op=op, Boon's folder, AH BONUS) blijft een aanbieding gewoon staan, met oordeel en als alternatief.
+assert.deepEqual(beoordeel([w('ah', [mx('zonder', null, { prijs: 2, normaalPrijs: null })])]).map((x) => x.id), ['zonder']);
+assert.equal(een([w('ah', [p({ prijsPerEenheid: 1, normaalPrijs: null })], refs(2, 3, 4))]).oordeel, 'beste');
 
 // Boon's: de invoer met de laatste geldigTot wint, niet het hoogste weeknummer (jaarwisseling).
 assert.equal(kiesInvoer([{ naam: 'boons-w52.json', inv: { geldigTot: '2026-12-27' } }, { naam: 'boons-w1.json', inv: { geldigTot: '2027-01-03' } }]).naam, 'boons-w1.json');
 assert.throws(() => kiesInvoer([]));
+// W43 vooraf ingevoerd (geldigVan in de toekomst) verdringt de lopende W42 niet; daarna wel.
+const w42 = { naam: 'boons-w42.json', inv: { geldigVan: '2026-10-12', geldigTot: '2026-10-18' } }, w43 = { naam: 'boons-w43.json', inv: { geldigVan: '2026-10-19', geldigTot: '2026-10-25' } };
+assert.equal(kiesInvoer([w42, w43], '2026-10-16').naam, 'boons-w42.json'); assert.equal(kiesInvoer([w42, w43], '2026-10-19').naam, 'boons-w43.json');
+assert.equal(kiesInvoer([w43], '2026-10-16').naam, 'boons-w43.json');
 // Een waarschuwing in een winkelbestand komt in de waarschuwingen van leesWinkels (en dus op de pagina).
 const tmp = mkdtempSync(join(tmpdir(), 'sa-test-'));
 writeFileSync(join(tmp, 'boons.json'), JSON.stringify({ winkel: 'boons', naam: "Boon's Markt", gemaakt: new Date().toISOString(), waarschuwing: 'folder is verlopen', aanbiedingen: [] }));
@@ -136,6 +144,18 @@ assert.equal(een([w('ah', oer, ahRef.map((r) => ({ ...r, prijsPerEenheid: 1.99, 
 const fam = (categorie, titel = 'x') => familieVan({ categorie, titel });
 assert.equal(fam('Desembrood bruin, volkoren, spelt', 'AH OerDesem spelt gesneden'), 'brood');
 assert.equal(fam('Jonge kaas (plakken)'), 'kaas');
+// Deelfamilies van te grove families (kip, kaas, sauzen, toetjes); zelfde nette naam op de pagina.
+assert.equal(fam('Kipfilet', 'AH Gebraden kipfilet'), 'kip-bereid'); assert.equal(fam('Kipfilet', 'AH Kipfilet'), 'kip');
+assert.equal(fam('Kaas', 'Brie 60+'), 'kaas-zacht'); assert.equal(fam('Kaas', 'Geraspte kaas jong'), 'kaas-snack'); assert.equal(fam('Kaas', 'Jong belegen 48+'), 'kaas');
+assert.equal(fam('Sauzen', 'Knorr Mix peperroomsaus'), 'sauzen-mix'); assert.equal(fam('Sauzen', 'Groene pesto'), 'sauzen-dip'); assert.equal(fam('Sauzen', 'Pastasaus basilicum'), 'sauzen-pasta');
+assert.equal(fam('Toetjes', 'AH Tiramisu'), 'toetjes-luxe'); assert.equal(fam('Toetjes', 'Griesmeelpudding'), 'toetjes-pudding');
+assert.equal(familieNaam('kaas-zacht'), 'Kaas'); assert.equal(familieNaam('toetjes-luxe'), 'Toetjes');
+// Debunk-ronde 2026-10-11: ketchup is geen pastasaus, Mayomix geen droge mix, rauwe kalkoenfilet geen snack, Bits & Bites geen kaassnack.
+assert.equal(fam('Sauzen', 'Heinz Tomaten ketchup'), 'sauzen'); assert.equal(fam('Sauzen', 'Heinz Mayomix Mayo Ketchup Saus'), 'sauzen');
+assert.equal(fam('Sauzen', 'Knorr Rundvleesjus'), 'sauzen-mix'); assert.equal(fam('Sauzen', 'Yoghurtdip harissa'), 'sauzen-dip'); assert.equal(fam('Sauzen', 'AH Mayo truffel'), 'sauzen');
+assert.equal(fam('Kipfilet', 'AH Kalkoenfilet blokjes'), 'kip'); assert.equal(fam('Kipfilet', 'AH Roasted kipfilet'), 'kip-bereid');
+assert.equal(fam('Kaas', 'Bits & Bites Grana padano'), 'kaas'); assert.equal(fam('Kaas', 'Mozzarella geraspt'), 'kaas-snack'); assert.equal(fam('Kaas', 'Kerrygold Cream cheese'), 'kaas-zacht');
+assert.equal(fam('Toetjes', 'Melkunie Breaker cheesecake yoghurt'), 'yoghurt');
 assert.equal(fam('Cola zero, suikervrij, light'), 'cola');
 assert.equal(fam('Rundergehakt'), 'gehakt');
 assert.equal(fam('Halfvolle melk'), 'melk');
@@ -182,9 +202,17 @@ for (const x of fxUit) {
   assert.equal(uit.aanbiedingen.filter((x) => x.online).length, 1);
 }
 
-// Een alleen-online alternatief blijft kandidaat, maar de kaart moet het kunnen tonen: online zit in het alternatief.
+// Een winkelaanbieding krijgt liever een winkelalternatief dan een (goedkoper) alleen-online alternatief.
 {
   const o = beoordeel([w('ah', [p({ id: 'a', titel: 'a', prijsPerEenheid: 3 })], [...refs(2, 4, 5), p({ id: 'on', titel: 'on', merk: 'X', prijsPerEenheid: 1, online: true })])]).find((x) => x.id === 'a');
+  assert.notEqual(o.alternatief.id, 'on'); assert.equal(!!o.alternatief.online, false); assert.equal(o.alternatief.prijsPerEenheid, 2);
+  // een online aanbieding mag wel het online alternatief krijgen
+  const q = beoordeel([w('ah', [p({ id: 'b', titel: 'b', prijsPerEenheid: 3, online: true })], [...refs(2, 4, 5), p({ id: 'on', titel: 'on', merk: 'X', prijsPerEenheid: 1, online: true })])]).find((x) => x.id === 'b');
+  assert.equal(q.alternatief.id, 'on');
+}
+// Zonder goedkoper winkelalternatief blijft een alleen-online alternatief kandidaat, en de kaart toont het: online zit in het alternatief.
+{
+  const o = beoordeel([w('ah', [p({ id: 'a', titel: 'a', prijsPerEenheid: 3 })], [...refs(4, 5, 6), p({ id: 'on', titel: 'on', merk: 'X', prijsPerEenheid: 1, online: true })])]).find((x) => x.id === 'a');
   assert.equal(o.alternatief.id, 'on'); assert.equal(o.alternatief.online, true);
   assert.equal(inkort([o]).alternatieven[0].online, true);
 }
@@ -255,6 +283,38 @@ assert.deepEqual(beoordeel([w('ah', [p({ categorie: null, titel: 'Tuinstoel' })]
   const wrn = (n) => r.waarschuwingen.filter((x) => x.startsWith(n + ':'));
   assert.equal(wrn('zonder').length, 1); assert.equal(wrn('kapot').length, 1); assert.equal(wrn('oud').length, 1); assert.equal(wrn('vers').length, 0);
   rmSync(t2, { recursive: true, force: true });
+}
+
+{ // AH "100 GRAM VOOR x" is per 100 g, niet per verpakking
+  const k = maakAhProduct({ webshopId: 1, title: 'AH Kogelbiefstuk', brand: 'AH', salesUnitSize: 'ca. 260 g', priceBeforeBonus: 9.49,
+    bonusMechanism: '100 GRAM VOOR 2.99', unitPriceDescription: 'normale prijs per kg €36.50' }, true);
+  assert.equal(k.prijsPerEenheid, 29.9); assert.equal(k.eenheid, 'kg'); assert.equal(k.prijs, 7.77); assert.equal(k.normaalPerEenheid, 36.5);
+  assert.equal(maakAhProduct({ webshopId: 2, title: 'x', salesUnitSize: 'per stuk', priceBeforeBonus: 5, bonusMechanism: '100 GRAM VOOR 2.99' }, true), null);
+}
+
+{ // AH Online-multipack: "4 stuks" is geen stukprijs; maat uit de titel, anders geen eenheidsprijs
+  const b = { webshopId: 3, promotionType: 'AHONLINE', salesUnitSize: '4 stuks', priceBeforeBonus: 9, currentPrice: 8, bonusMechanism: '10% volume voordeel' };
+  const l = maakAhProduct({ ...b, title: 'Lipton Ice tea 1.5L 4-pack' }, true);
+  assert.equal(l.eenheid, 'l'); assert.equal(l.prijsPerEenheid, 1.33);
+  const c = maakAhProduct({ ...b, title: 'Cola 4-pack' }, true);
+  assert.equal(c.eenheid, null); assert.equal(c.prijsPerEenheid, null);
+  assert.equal(maakAhProduct({ ...b, promotionType: undefined, title: 'AH Paprika 4 stuks', bonusMechanism: '10% korting' }, true).eenheid, 'stuk');
+}
+
+// Contractvalidatie: geldigTot buiten jjjj-mm-dd en aanbiedingen zonder titel/prijs geven een waarschuwing; goede data geen.
+{
+  const t4 = mkdtempSync(join(tmpdir(), 'sa-test4-'));
+  const sw = (winkel, aanb, ref = []) => writeFileSync(join(t4, winkel + '.json'), JSON.stringify({ winkel, naam: winkel, gemaakt: new Date().toISOString(), aanbiedingen: aanb, referentie: ref }));
+  sw('goed', [p({ id: '1', geldigTot: '2026-10-18' }), p({ id: '2', geldigTot: null })], [p({ id: '3' })]);
+  sw('datum', [p({ id: '1', geldigTot: '18-10-2026' }), p({ id: '2', geldigTot: '2026-10-18T22:00:00Z' }), p({ id: '3', geldigTot: '2026-13-45' })], [p({ id: '4', geldigTot: 20261018 })]);
+  sw('kaal', [p({ id: '1', prijs: '1,50' }), p({ id: '2', titel: undefined })]);
+  const r = leesWinkels(t4);
+  const wrn = (n) => r.waarschuwingen.filter((x) => x.startsWith(n + ':'));
+  assert.equal(wrn('goed').length, 0);
+  assert.equal(wrn('datum').length, 1); assert.ok(wrn('datum')[0].includes('4 producten met een geldigTot'));
+  assert.equal(wrn('kaal').length, 1); assert.ok(wrn('kaal')[0].includes('2 producten zonder titel'));
+  assert.deepEqual(valideerProducten([p({ geldigTot: '2026-10-18' })], true), { datum: 0, kaal: 0 });
+  rmSync(t4, { recursive: true, force: true });
 }
 
 console.log('test.mjs: alles ok');

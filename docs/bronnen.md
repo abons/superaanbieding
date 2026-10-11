@@ -8,6 +8,17 @@ redirects (Jumbo stuurt `/aanbiedingen` door naar `/aanbiedingen/nu`; zonder red
 
 Volgorde van gemak: **1 Aldi, 2 Jumbo, 3 Lidl, 4 Plus**. Alleen Plus heeft de browser nodig.
 
+## Voorwaarden en belasting van de bronnen (besluit 2026-10-11)
+
+- ⚠️ **Alle bronnen zijn onofficieel** (Aldi: de Next-data van de gewone pagina): de AH app-API (`api.ah.nl`, anoniem token, app-UA), Jumbo `api/graphql`
+  (met nagebootste `apollographql-client-*`-headers), Dirk GraphQL en Lidl `q/api/search` zijn geen gepubliceerde API's. De voorwaarden van die winkels
+  staan geautomatiseerd uitlezen van de site/app waarschijnlijk niet toe en kunnen het blokkeren (IP, token, headers); dit is niet per winkel nagelezen.
+- Daarom: alleen eigen gebruik (server op 127.0.0.1, tailscale, geen publieke pagina, geen herpublicatie van de data), geen omzeiling van
+  bot-bescherming (Plus is daarom niet gedaan), `robots.txt` is per bron handmatig nagelezen (Boon's: `?offer=` niet gebruikt); de code controleert het niet zelf.
+- Belasting: `serve.mjs` laat een verzamelaar hoogstens elke 6 uur lopen (`SA_VERS_UUR`, 0 = altijd) en na een fout (ook 429) 2 uur niet; AH wacht daarbij
+  zelf 2/4/6 s tussen pogingen op 429/5xx en pauzeert 220 ms per request. Aanbiedingen wisselen per dag/week, vaker verversen levert niets.
+- Blijft een winkel blokkeren: de collector faalt geisoleerd (pagina toont de waarschuwing); niet doorzetten met rotatie van UA/IP.
+
 ## Aldi — plain fetch, een request voor alles (makkelijkst)
 
 - `GET https://www.aldi.nl/aanbiedingen.html` (deze week) en `.../aanbiedingen-volgende-week.html` (beide 200, ~435 KB).
@@ -124,6 +135,15 @@ Twee routes, allebei plain fetch vanuit Node:
   (bot-bescherming, OutSystems-versies, moduleVersion). 
 - Aanbeveling: laatst doen. Variant 1 (simpelst): Claude/MCP laadt `/aanbiedingen`, scrapet de tegels en laat per promo `DataActionPromotionOfferDetail_Get`
   uit de pagina lopen en schrijft `data/plus.json`. Variant 2: Node start Chrome met `--remote-debugging-port=9222` en doet hetzelfde via CDP (`Runtime.evaluate`).
+
+### Besluit Plus (2026-10-11): geen `winkels/plus.mjs`
+
+- Herhaalde test: curl met browser-UA op `/aanbiedingen` en `/robots.txt` geeft 403 (Incapsula).
+- Alleen een echte of door CDP aangestuurde Chrome komt door de JS-challenge: dat is de bot-bescherming omzeilen, geen gewone fetch. Dat doen we niet,
+  ook niet "beleefd" (onbewaakt via `serve.mjs`, om de 6 uur).
+- Niet onderzocht: folder-aggregators (zoals folderz.nl) voor Plus; een gewone fetch daarop is de enige legitieme kandidaat en nog te doen.
+- Daarnaast fragiel: moduleVersion/apiVersion en CSRF-token wisselen per deploy; vereist Chrome op de pc; botst met "plain Node, geen afhankelijkheden, collector als eigen proces".
+- Gevolg: Plus ontbreekt in de tool, ook als referentieprijs. Heroverwegen alleen bij een open feed of toestemming van Plus.
 
 ## Referentieproducten, samengevat
 

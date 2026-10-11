@@ -125,6 +125,8 @@ export const FAMILIES = [...new Set(REGELS.map((r) => r[0]))].filter((f) => !GEE
 export const STUK_FAMILIES = new Set(['brood', 'broodjes', 'eieren']);
 // Families waar "per stuk" alleen binnen dezelfde winkelcategorie telt: ananas is geen banaan, avocado geen paprika.
 export const STUK_CATEGORIE_FAMILIES = new Set(['groente', 'fruit']);
+// Families waar de familie-terugval onzin geeft (kervel tegen zwarte peper, Aromat tegen MSG): alleen vergelijken binnen de winkelcategorie.
+export const GEEN_TERUGVAL = new Set(['kruiden']);
 
 const cache = new Map();
 // -> familienaam of null (grabbelbakken en onduidelijke categorieen krijgen geen familie)
@@ -142,6 +144,23 @@ export function familieVan(p) {
     else if (/\bhalf\b|\bhalve\b/.test(tit)) f = 'brood-half'; // een half brood is niet te vergelijken met een heel brood
     else if (f === 'brood' && !/brood|vloer|rond|tijger|desem|bruin|wit|volkoren|meergranen|waldkorn|afbak|boule|baguette|ciabatta|casino|pistolet|gesneden|petit|batard|heel|pains|bastille|boulogne|triomphe|molen|spelt|rogge/.test(tit)) f = 'koek';
     else if (f === 'brood' && /broodje|bollen|bolletje|croissant|puntje|\bbol\b/.test(tit)) f = 'broodjes';
+  }
+  // Te grove families (kip, kaas, sauzen, toetjes): de titel splitst af wat geen gelijkwaardig alternatief is. Alleen voor de
+  // familie-terugval; de winkelcategorie blijft de eerste keus. De deelfamilies tonen op de pagina onder dezelfde naam (SUBFAMILIE).
+  if (f === 'kip') {
+    if (/gebraden|gerookt|gegaard|gegrild|roasted|cordon|schnitzel|nugget|gyoza|krokant|rollade|kebab|shoarma|doner|worst|spies|saté|sate|ontbijt|kipkorn|vleeswaar|flakes|wings|teriyaki|kiprol/.test(tit)) f = 'kip-bereid';
+  } else if (f === 'kaas') {
+    if (/geraspt|rasp/.test(tit)) f = 'kaas-snack';
+    else if (/smeer|spread|cream cheese|creamy|boursin|roomkaas|ricotta|mascarpone|cottage|mozzarella|feta|apetina|brie|camembert|geit|schaap|blauw|bleu|blue\b|fondue|fondu|hut?tenkase|paneer|halloumi|burrata/.test(tit)) f = 'kaas-zacht';
+    else if (/blokjes|kaasblokje|hapjes|snack|(?<!& )bites|schijfjes|sticks/.test(tit)) f = 'kaas-snack';
+  } else if (f === 'sauzen') {
+    if (/(?<!mayo)mix\b|dipmix|poeder|kruidenmix|maaltijdmix|bouillon|jus\b|\bdroog\b|fond\b|bindmiddel|roux/.test(tit)) f = 'sauzen-mix';
+    else if (/pesto|tapenade|spread|dip|guacamole|hummus|tzatziki|salsa|aioli|sambal|sriracha/.test(tit)) f = 'sauzen-dip';
+    else if (!/ketchup|boter|ravioli|tomatenpuree|concentraat/.test(tit) && /tomaat|tomaten|passata|pizzasaus|pastasaus|pulp|puree|besciamella|bolognese|carbonara/.test(tit)) f = 'sauzen-pasta';
+  } else if (f === 'toetjes') {
+    if (/yoghurt|kwark|skyr|knijp|activia|danoontje/.test(tit) || /yoghurt/.test(cat)) f = 'yoghurt';
+    else if (/tiramisu|trifle|dessert|cheesecake|panna cotta|miljonair|\bijs\b|mousse|creme brulee|tarte|taart/.test(tit)) f = 'toetjes-luxe';
+    else if (/pudding|griesmeel|rijstebrij|rijstpap/.test(tit)) f = 'toetjes-pudding';
   }
   if (f && GEEN_VERGELIJKING.has(f)) f = null;
   if (cache.size > 200000) cache.clear();
@@ -165,4 +184,5 @@ const NAMEN = {
   'fruit': 'Fruit', 'groente': 'Groente', 'pasta-rijst': 'Pasta en rijst', 'olie-azijn': 'Olie en azijn', 'ijs': 'IJs',
 };
 // Nette naam voor de pagina; producten zonder familie heten 'Overig'.
-export const familieNaam = (f) => (f ? NAMEN[f] ?? f[0].toUpperCase() + f.slice(1) : 'Overig');
+const SUBFAMILIE = { 'kip-bereid': 'kip', 'kaas-zacht': 'kaas', 'kaas-snack': 'kaas', 'sauzen-mix': 'sauzen', 'sauzen-dip': 'sauzen', 'sauzen-pasta': 'sauzen', 'toetjes-luxe': 'toetjes', 'toetjes-pudding': 'toetjes' };
+export const familieNaam = (f) => (f ? NAMEN[SUBFAMILIE[f] ?? f] ?? NAMEN[f] ?? f[0].toUpperCase() + f.slice(1) : 'Overig');

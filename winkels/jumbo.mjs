@@ -164,8 +164,14 @@ async function main() {
   const hoofd = eerste.facets.find(f => f.key === 'category')?.values || [];
   const referentie = [];
   const refGezien = new Set();
+  const mislukt = [];
   for (const h of hoofd) {
-    const { producten } = await alles([{ key: 'category', values: [h.id] }]);
+    let producten;
+    try { ({ producten } = await alles([{ key: 'category', values: [h.id] }])); } catch (e) {
+      mislukt.push(h.name || h.id); // één falende hoofdcategorie (na retries) overslaan, met waarschuwing in het bestand
+      console.error(`jumbo.mjs: referentie '${h.name || h.id}' mislukt: ${e.message}`);
+      continue;
+    }
     for (const p of producten) {
       if (refGezien.has(p.id) || inAanbod.has(p.id) || !p.price || !(p.price.price > 0)) continue;
       if (p.price.promoPrice != null || p.promotions?.length) continue; // alleen gewone prijzen
@@ -180,7 +186,12 @@ async function main() {
   try { vorig = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'jumbo.json'), 'utf8')).aanbiedingen.length; } catch { /* geen of kapot vorig bestand */ }
   if (!aanbiedingen.length || (aanbiedingen.length < vorig * 0.5 && !process.env.SA_FORCEER)) throw new Error(`${aanbiedingen.length} aanbiedingen (vorige run ${vorig}), structuur gewijzigd? (bij een echte daling: SA_FORCEER=1 of data/jumbo.json weghalen)`);
 
-  const uit = { winkel: 'jumbo', naam: 'Jumbo', gemaakt: new Date().toISOString(), aanbiedingen, referentie };
+  // Meer dan een tiende van de hoofdcategorieen mislukt (een hoofdcategorie is een heel schap): de API is stuk; vorig bestand laten staan.
+  if (mislukt.length > Math.max(1, hoofd.length * 0.1)) throw new Error(`${mislukt.length} van ${hoofd.length} referentie-categorieen mislukt`);
+
+  const uit = { winkel: 'jumbo', naam: 'Jumbo', gemaakt: new Date().toISOString(),
+    ...(mislukt.length ? { waarschuwing: `referentie ontbreekt voor ${mislukt.length} categorie(en): ${mislukt.slice(0, 5).join(', ')}` } : {}),
+    aanbiedingen, referentie };
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'jumbo.json'), JSON.stringify(uit, null, 1));

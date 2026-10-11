@@ -8,7 +8,7 @@ Stores: Albert Heijn, Dirk, Jumbo, Aldi, Lidl, and Boon's Markt (hand-read weekl
 ## Usage
 
 ```
-node serve.mjs                 # page on http://127.0.0.1:8092, refreshes hourly
+node serve.mjs                 # page on http://127.0.0.1:8092, merges hourly, collectors every 6 h
 node serve.mjs --fixtures      # same, with test data from fixtures/ (collectors do not run)
 node serve.mjs --geen-ophalen  # real data from data/, collectors do not run
 node vergelijk.mjs             # merge only: data/*.json -> data/aanbiedingen.json + build/
