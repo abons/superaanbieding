@@ -9,18 +9,26 @@
 // normaalPrijs wordt door dezelfde deler gedeeld (hij geldt voor dezelfde hoeveelheid). Onzeker of zonder prijs: overgeslagen.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const MAP = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const r2 = n => Math.round(n * 100) / 100;
 const HUISMERKEN = new Set(['boonacker', "g'woon", '1 de beste', "boon's"]);
 
+const vandaagNL = () => new Date().toLocaleDateString('sv', { timeZone: 'Europe/Amsterdam' });
+
+// Kiest uit [{naam, inv}] de invoer met de laatste geldigTot (niet het weeknummer: dat loopt bij de jaarwisseling terug).
+// Zonder geldigTot telt een invoer als oudste.
+export function kiesInvoer(invoeren) {
+  if (!invoeren.length) throw new Error('geen invoer/boons-w*.json gevonden');
+  return invoeren.slice().sort((a, b) => String(b.inv.geldigTot || '').localeCompare(String(a.inv.geldigTot || '')) || b.naam.localeCompare(a.naam))[0];
+}
+
 function nieuwsteInvoer() {
   const dir = path.join(MAP, 'invoer');
-  const f = fs.existsSync(dir) ? fs.readdirSync(dir).map(n => n.match(/^boons-w(\d+)\.json$/)).filter(Boolean) : [];
-  if (!f.length) throw new Error('geen invoer/boons-w*.json gevonden');
-  f.sort((a, b) => +b[1] - +a[1]);
-  return path.join(dir, f[0][0]);
+  const namen = fs.existsSync(dir) ? fs.readdirSync(dir).filter(n => /^boons-w\d+\.json$/.test(n)) : [];
+  const k = kiesInvoer(namen.map(naam => ({ naam, inv: JSON.parse(fs.readFileSync(path.join(dir, naam), 'utf8')) })));
+  return { bestand: path.join(dir, k.naam), inv: k.inv };
 }
 
 // Aantal stuks waarvoor de stickerprijs geldt.
@@ -61,8 +69,17 @@ const CATS = [
 const categorie = t => (CATS.find(([re]) => re.test(t)) || [0, 'Overig'])[1];
 
 function main() {
-  const bestand = nieuwsteInvoer();
-  const inv = JSON.parse(fs.readFileSync(bestand, 'utf8'));
+  const { bestand, inv } = nieuwsteInvoer();
+  const dir = path.join(MAP, 'data');
+  const vandaag = vandaagNL();
+  if (!inv.geldigTot || inv.geldigTot < vandaag) {
+    // Folder verlopen: liever niets dan oude prijzen als aanbieding. De waarschuwing komt via vergelijk.mjs op de pagina.
+    const waarschuwing = `Boon's Markt: folder ${path.basename(bestand)} is verlopen (geldig tot ${inv.geldigTot || 'onbekend'}), nieuwe invoer/boons-w<week>.json nodig`;
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'boons.json'), JSON.stringify({ winkel: 'boons', naam: "Boon's Markt", gemaakt: new Date().toISOString(), waarschuwing, aanbiedingen: [], referentie: [] }, null, 1));
+    console.log('WAARSCHUWING: ' + waarschuwing);
+    return;
+  }
   const aanbiedingen = [];
   const overgeslagen = { onzeker: 0, zonderPrijs: 0 };
   inv.producten.forEach((p, i) => {
@@ -94,10 +111,11 @@ function main() {
     });
   });
   const uit = { winkel: 'boons', naam: "Boon's Markt", gemaakt: new Date().toISOString(), aanbiedingen, referentie: [] };
-  const dir = path.join(MAP, 'data');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'boons.json'), JSON.stringify(uit, null, 1));
   console.log(`boons: ${aanbiedingen.length} aanbiedingen uit ${path.basename(bestand)} (${inv.producten.length} regels; overgeslagen: ${overgeslagen.onzeker} onzeker, ${overgeslagen.zonderPrijs} zonder prijs)`);
 }
 
-try { main(); } catch (e) { console.error('boons.mjs mislukt:', e.message); process.exit(1); }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try { main(); } catch (e) { console.error('boons.mjs mislukt:', e.message); process.exit(1); }
+}

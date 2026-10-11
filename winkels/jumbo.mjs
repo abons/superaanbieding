@@ -27,7 +27,7 @@
 //  - Huismerk: brand === "Jumbo" (ook "Jumbo Bio" e.d. via beginsWith).
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const URL_GQL = 'https://www.jumbo.com/api/graphql';
 const HEADERS = {
@@ -135,14 +135,23 @@ function maakProduct(p, aanbieding) {
   };
 }
 
+// 'Gratis lepelsetje / glas / blikjes ... OP=OP': het gratis cadeau zit bij het product, de prijs zelf zakt niet. Prijs >= normaalprijs
+// is dan geen aanbieding en moet niet als zodanig getoond of vergeleken worden.
+export function isGratisCadeauZonderKorting(a) {
+  return /\bgratis\b/i.test(a.mechanisme || '') && /op=op/i.test(a.mechanisme || '') && a.normaalPrijs > 0 && a.prijs >= a.normaalPrijs;
+}
+
 async function main() {
   const { producten: ruwAanbod } = await alles(FILTER_AANBOD);
   const aanbiedingen = [];
   const inAanbod = new Set();
+  let gratisWeg = 0;
   for (const p of ruwAanbod) {
     if (inAanbod.has(p.id) || !p.price || !(p.price.price > 0)) continue;
     inAanbod.add(p.id);
-    aanbiedingen.push(maakProduct(p, true));
+    const a = maakProduct(p, true);
+    if (isGratisCadeauZonderKorting(a)) { gratisWeg++; continue; }
+    aanbiedingen.push(a);
   }
   const cats = new Set(aanbiedingen.map(a => a.categorie));
 
@@ -167,7 +176,7 @@ async function main() {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'jumbo.json'), JSON.stringify(uit, null, 1));
   const metPpe = l => l.filter(x => x.prijsPerEenheid != null).length;
-  console.log(`jumbo: ${aanbiedingen.length} aanbiedingen (${metPpe(aanbiedingen)} met prijs/eenheid), ${referentie.length} referentie (${metPpe(referentie)} met prijs/eenheid), ${cats.size} categorieen`);
+  console.log(`jumbo: ${aanbiedingen.length} aanbiedingen (${metPpe(aanbiedingen)} met prijs/eenheid), ${referentie.length} referentie (${metPpe(referentie)} met prijs/eenheid), ${cats.size} categorieen; ${gratisWeg} Gratis-acties zonder korting weggelaten`);
 }
 
-main().catch(e => { console.error('jumbo.mjs mislukt:', e.message); process.exit(1); });
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(e => { console.error('jumbo.mjs mislukt:', e.message); process.exit(1); });

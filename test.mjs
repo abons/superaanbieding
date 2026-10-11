@@ -1,6 +1,11 @@
 // Controleert de oordeelslogica van vergelijk.mjs en de families van familie.mjs. Gebruik: node test.mjs
 import assert from 'node:assert/strict';
-import { beoordeel, inkort, leesWinkels } from './vergelijk.mjs';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { beoordeel, inkort, leesWinkels, pakLock, LOCK_STALE_MS, MIN_VERHOUDING } from './vergelijk.mjs';
+import { kiesInvoer } from './winkels/boons.mjs';
+import { isGratisCadeauZonderKorting } from './winkels/jumbo.mjs';
 import { familieVan, familieNaam } from './familie.mjs';
 
 const p = (o) => ({ id: 'x', titel: 't', merk: null, huismerk: false, categorie: 'Cola', eenheid: 'l', prijs: 1, prijsPerEenheid: 1, ...o });
@@ -42,11 +47,59 @@ assert.notEqual(een([w('ah', [eigen[0]], [...eigen.slice(1), p({ id: 'e', merk: 
 
 // Zichzelf (ook als referentie) is nooit het alternatief; id is per winkel uniek.
 assert.equal(een([w('ah', [p()], [p()])]).oordeel, 'onbekend');
+// Met >= 3 andere kandidaten bepaalt de uitsluiting de uitkomst: een oude kopie van zichzelf (zelfde id, goedkoper) mag niet het alternatief zijn.
+a = een([w('ah', [p({ prijsPerEenheid: 3 })], [p({ prijsPerEenheid: 1 }), ...refs(2.5, 4, 5)])]);
+assert.equal(a.oordeel, 'merk-goedkoper'); assert.equal(a.alternatief.id, 'r0'); assert.equal(a.besparing, 0.5);
 
 // Onbekend: geen eenheidsprijs, andere categorie, andere eenheid.
 assert.equal(een([w('ah', [p({ prijsPerEenheid: null })], refs(1, 2, 3))]).oordeel, 'onbekend');
 assert.equal(een([w('ah', [p()], refs(1, 2, 3).map((r) => ({ ...r, categorie: 'Overig' })))]).oordeel, 'onbekend');
 assert.equal(een([w('ah', [p()], refs(1, 2, 3).map((r) => ({ ...r, eenheid: 'kg' })))]).oordeel, 'onbekend');
+
+// Categorie 'overig' (elke schrijfwijze, ook leeg) is geen echte smalle categorie: nooit een vergelijking op categorie.
+for (const c of ['Overig', ' OVERIG ', '', null]) {
+  a = een([w('ah', [p({ categorie: c })], refs(1, 2, 3).map((r) => ({ ...r, categorie: c })))]);
+  assert.equal(a.oordeel, 'onbekend', 'overig als categorie: ' + c); assert.equal(a.vergelijking, null);
+}
+// ... maar wel via de familie als die er is.
+a = een([w('ah', [p({ categorie: 'Overig', titel: 'Goudse kaas 48+', eenheid: 'kg', prijsPerEenheid: 12 })], [8, 9, 10].map((n) => p({ id: 'k' + n, categorie: 'Overig', titel: 'Jonge kaas ' + n, eenheid: 'kg', merk: 'X', prijsPerEenheid: n })))]);
+assert.equal(a.vergelijking, 'familie'); assert.equal(a.oordeel, 'merk-goedkoper'); assert.equal(a.alternatief.id, 'k8');
+
+// Plausibiliteitsgrens: een alternatief van minder dan 20% van de prijs per eenheid is geen vergelijkbaar product.
+assert.equal(MIN_VERHOUDING, 0.2);
+a = een([w('ah', [p({ prijsPerEenheid: 1250 })], [p({ id: 'zout', prijsPerEenheid: 0.75, merk: 'X' }), ...refs(1000, 1100, 1300)])]);
+assert.equal(a.alternatief.id, 'r0'); assert.equal(a.besparing, 250); // niet 1249.25 t.o.v. het zout
+assert.equal(een([w('ah', [p({ prijsPerEenheid: 375 })], [p({ id: 'spray', prijsPerEenheid: 3.6, merk: 'X' }), ...refs(1, 2, 3)])]).oordeel, 'onbekend'); // alleen implausibele alternatieven
+assert.equal(een([w('ah', [p({ prijsPerEenheid: 5 })], refs(1, 2, 3))]).oordeel, 'merk-goedkoper'); // precies op de grens (1 = 20%) telt wel mee
+
+// Verlopen aanbiedingen (geldigTot voor vandaag) worden niet getoond en zijn geen alternatief; vandaag zelf geldt nog.
+const mx = (id, geldigTot, o = {}) => p({ id, geldigTot, merk: 'Z', ...o });
+let uit = beoordeel([w('ah', [mx('oud', '2026-10-10'), mx('vandaag', '2026-10-11'), mx('zonder', null)])], '2026-10-11');
+assert.deepEqual(uit.map((x) => x.id), ['vandaag', 'zonder']);
+a = beoordeel([w('ah', [p({ prijsPerEenheid: 3 }), mx('oud', '2026-10-10', { prijsPerEenheid: 1 }), mx('n1', null, { prijsPerEenheid: 2 }), mx('n2', null, { prijsPerEenheid: 2.5 }), mx('n3', null, { prijsPerEenheid: 2.6 })])], '2026-10-11').find((x) => x.id === 'x');
+assert.equal(a.alternatief.id, 'n1');
+// Prijs >= normaalprijs is geen aanbieding (ook niet als alternatief).
+assert.deepEqual(beoordeel([w('ah', [mx('gelijk', null, { prijs: 2, normaalPrijs: 2 }), mx('goed', null, { prijs: 1, normaalPrijs: 2 })])]).map((x) => x.id), ['goed']);
+
+// Boon's: de invoer met de laatste geldigTot wint, niet het hoogste weeknummer (jaarwisseling).
+assert.equal(kiesInvoer([{ naam: 'boons-w52.json', inv: { geldigTot: '2026-12-27' } }, { naam: 'boons-w1.json', inv: { geldigTot: '2027-01-03' } }]).naam, 'boons-w1.json');
+assert.throws(() => kiesInvoer([]));
+// Een waarschuwing in een winkelbestand komt in de waarschuwingen van leesWinkels (en dus op de pagina).
+const tmp = mkdtempSync(join(tmpdir(), 'sa-test-'));
+writeFileSync(join(tmp, 'boons.json'), JSON.stringify({ winkel: 'boons', naam: "Boon's Markt", gemaakt: new Date().toISOString(), waarschuwing: 'folder is verlopen', aanbiedingen: [] }));
+const lw = leesWinkels(tmp);
+assert.equal(lw.winkels.length, 1); assert.ok(lw.waarschuwingen.some((x) => x.includes('folder is verlopen')));
+// Lock: tweede poging mislukt, een stale lock (> 10 min) wordt overgenomen.
+const lock = join(tmp, 'vergelijk.lock');
+assert.equal(pakLock(lock), true); assert.equal(pakLock(lock), false);
+assert.equal(pakLock(lock, Date.now() + LOCK_STALE_MS + 60e3), true);
+rmSync(tmp, { recursive: true, force: true });
+
+// Jumbo: 'Gratis ... OP=OP' zonder korting is geen aanbieding; met echte korting of zonder Gratis wel.
+assert.equal(isGratisCadeauZonderKorting({ mechanisme: 'Gratis glas bij 2 Leffe Packs, Alleen online - OP=OP', prijs: 6.65, normaalPrijs: 6.65 }), true);
+assert.equal(isGratisCadeauZonderKorting({ mechanisme: 'Gratis lepelsetje, Alleen online - OP=OP', prijs: 10, normaalPrijs: 13.79 }), false);
+assert.equal(isGratisCadeauZonderKorting({ mechanisme: '1+1 gratis', prijs: 1, normaalPrijs: 2 }), false);
+assert.equal(isGratisCadeauZonderKorting({ mechanisme: null, prijs: 2, normaalPrijs: 2 }), false);
 
 // Categorie is hoofdletterongevoelig; referenties zonder eenheidsprijs tellen niet mee.
 assert.equal(een([w('ah', [p({ prijsPerEenheid: 3 })], [...refs(1, 2, 3).map((r) => ({ ...r, categorie: ' cola ' })), p({ id: 's', prijsPerEenheid: null })])]).oordeel, 'merk-goedkoper');

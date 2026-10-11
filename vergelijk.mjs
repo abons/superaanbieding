@@ -1,6 +1,6 @@
 // Voegt data/<winkel>.json samen, geeft elke aanbieding een oordeel en bouwt build/ (pagina + pwa + json).
 // Gebruik: node vergelijk.mjs [--fixtures]   (--fixtures leest uit fixtures/ i.p.v. data/)
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -9,7 +9,20 @@ import { familieVan, familieNaam, STUK_FAMILIES } from './familie.mjs';
 export const DREMPEL = 0.05; // binnen 5% van het goedkoopste = goed
 export const MIN_KANDIDATEN = 3; // zo veel vergelijkbare producten (zonder de aanbieding zelf) nodig voor een echte vergelijking
 
+// Plausibiliteitsgrens: een kandidaat-alternatief dat per eenheid minder dan 20% van de aanbieding kost is geen
+// vergelijkbaar product maar een verkeerd ingedeeld of verkeerd gemeten ding (vanillestokje vs keukenzout 'bespaar
+// EUR 1249 per kg', diffuser vs spray). Echte alternatieven zijn zelden meer dan 5x goedkoper: een gemiste besparing
+// is goedkoper dan een absurde.
+export const MIN_VERHOUDING = 0.2;
+// Catch-all categorie: zegt niets over vergelijkbaarheid, doet alleen mee via de familie-terugval.
+const isOverig = (c) => { const t = String(c ?? '').trim().toLowerCase(); return t === '' || t === 'overig'; };
+
 const geldig = (n) => typeof n === 'number' && Number.isFinite(n) && n > 0;
+// Vandaag als jjjj-mm-dd in Nederlandse tijd (geldigTot is een datum zonder tijd).
+export const vandaagNL = () => new Date().toLocaleDateString('sv', { timeZone: 'Europe/Amsterdam' });
+// Een aanbieding telt niet meer mee als hij verlopen is (geldigTot voor vandaag) of geen aanbieding is (prijs >= normaalprijs).
+const verlopen = (p, vandaag) => typeof p.geldigTot === 'string' && p.geldigTot < vandaag;
+const geenKorting = (p) => geldig(p.normaalPrijs) && p.prijs >= p.normaalPrijs;
 const sleutel = (p) => `${String(p.categorie ?? '').trim().toLowerCase()}|${p.eenheid}`;
 const rond = (n) => Math.round(n * 100) / 100;
 // Merk als vergelijkingssleutel: alle huismerken van een winkel (AH, AH Biologisch, AH Liefde & Passie, ...) zijn een merk.
@@ -32,19 +45,20 @@ function genoeg(p, winkel, lijst) {
 // familie en vergelijking ('categorie' | 'familie' | null = geen goede vergelijking).
 // Vergelijkt eerst binnen de (smalle) winkelcategorie, en valt anders terug op de grove productfamilie (familie.mjs),
 // altijd op dezelfde eenheid. 'stuk' wordt alleen vergeleken binnen families waar dat zinvol is (STUK_FAMILIES).
-export function beoordeel(winkels) {
+export function beoordeel(winkels, vandaag = vandaagNL()) {
   const perCat = new Map(); // categorie|eenheid -> kandidaten, goedkoopste eerst
   const perFam = new Map(); // familie|eenheid -> kandidaten, goedkoopste eerst
   const voeg = (map, k, c) => { if (!map.has(k)) map.set(k, []); map.get(k).push(c); };
   for (const w of winkels) {
     for (const [lijst, aanbieding] of [[w.aanbiedingen, true], [w.referentie, false]]) {
       for (const p of lijst ?? []) {
+        if (aanbieding && p && (verlopen(p, vandaag) || geenKorting(p))) continue;
         if (!p || !p.eenheid || !geldig(p.prijsPerEenheid)) continue;
         const fam = familieVan(p);
         if (!p.categorie && !fam) continue;
         const c = { winkel: w.winkel, id: p.id, titel: p.titel, merk: p.merk ?? null, huismerk: !!p.huismerk,
           prijsPerEenheid: p.prijsPerEenheid, eenheid: p.eenheid, aanbieding };
-        if (p.categorie && (p.eenheid !== 'stuk' || (fam && STUK_FAMILIES.has(fam)))) voeg(perCat, sleutel(p), c);
+        if (!isOverig(p.categorie) && (p.eenheid !== 'stuk' || (fam && STUK_FAMILIES.has(fam)))) voeg(perCat, sleutel(p), c);
         if (fam && (p.eenheid !== 'stuk' || STUK_FAMILIES.has(fam))) voeg(perFam, fam + '|' + p.eenheid, c);
       }
     }
@@ -56,12 +70,13 @@ export function beoordeel(winkels) {
   const uit = [];
   for (const w of winkels) {
     for (const p of w.aanbiedingen ?? []) {
-      if (!p || typeof p.titel !== 'string' || !geldig(p.prijs)) continue;
+      if (!p || typeof p.titel !== 'string' || !geldig(p.prijs) || verlopen(p, vandaag) || geenKorting(p)) continue;
       const fam = familieVan(p);
       const basis = { ...p, winkel: w.winkel, oordeel: 'onbekend', alternatief: null, besparing: 0, familie: familieNaam(fam), vergelijking: null };
       if (p.eenheid && geldig(p.prijsPerEenheid) && (p.eenheid !== 'stuk' || (fam && STUK_FAMILIES.has(fam)))) {
-        let lijst = p.categorie ? perCat.get(sleutel(p)) : null, soort = 'categorie';
-        if (!lijst || !genoeg(p, w.winkel, lijst)) { lijst = fam ? perFam.get(fam + '|' + p.eenheid) : null; soort = 'familie'; }
+        const plausibel = (l) => (l ? l.filter((c) => c.prijsPerEenheid >= p.prijsPerEenheid * MIN_VERHOUDING) : null);
+        let lijst = isOverig(p.categorie) ? null : plausibel(perCat.get(sleutel(p))), soort = 'categorie';
+        if (!lijst || !genoeg(p, w.winkel, lijst)) { lijst = fam ? plausibel(perFam.get(fam + '|' + p.eenheid)) : null; soort = 'familie'; }
         if (lijst && genoeg(p, w.winkel, lijst)) {
           const alt = lijst.find((c) => !(c.winkel === w.winkel && c.id === p.id));
           basis.vergelijking = soort;
@@ -91,7 +106,8 @@ export function leesWinkels(dir, controleerLeeftijd = true) {
       if (!j || !Array.isArray(j.aanbiedingen)) throw new Error('veld "aanbiedingen" ontbreekt');
       const id = String(j.winkel ?? n.slice(0, -5));
       winkels.push({ winkel: id, naam: j.naam ?? id, gemaakt: j.gemaakt ?? null, aanbiedingen: j.aanbiedingen, referentie: Array.isArray(j.referentie) ? j.referentie : [] });
-      const leeftijd = j.gemaakt ? Date.now() - Date.parse(j.gemaakt) : NaN;
+      if (typeof j.waarschuwing === 'string' && j.waarschuwing) waarschuwingen.push(`${j.naam ?? id}: ${j.waarschuwing}`);
+      const leeftijd =j.gemaakt ? Date.now() - Date.parse(j.gemaakt) : NaN;
       if (controleerLeeftijd && leeftijd > 48 * 3600e3) waarschuwingen.push(`${j.naam ?? id}: gegevens zijn ouder dan 2 dagen`);
     } catch (e) { waarschuwingen.push(`${n} overgeslagen: ${e.message}`); }
   }
@@ -135,6 +151,29 @@ export function inkort(aanbiedingen) {
   return { aanbiedingen: lijst, alternatieven: alts, afbeeldingen: voorNa };
 }
 
+// Atomair schrijven: eerst naar een tmp-bestand in dezelfde map, dan rename (op Windows en POSIX vervangt dat het doel).
+function schrijfAtomair(pad, inhoud) {
+  const tmp = `${pad}.${process.pid}.tmp`;
+  writeFileSync(tmp, inhoud);
+  renameSync(tmp, pad);
+}
+
+// Eenvoudige lock (zoals growatt/ophalen.lock): voorkomt dat twee runs elkaars build/ overschrijven; stale na 10 min.
+export const LOCK_STALE_MS = 10 * 60e3;
+export function pakLock(pad, nu = Date.now()) {
+  mkdirSync(dirname(pad), { recursive: true });
+  for (let poging = 0; poging < 2; poging++) {
+    try { writeFileSync(pad, String(process.pid), { flag: 'wx' }); return true; } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      let oud = false;
+      try { oud = nu - statSync(pad).mtimeMs > LOCK_STALE_MS; } catch { continue; }
+      if (!oud) return false;
+      try { unlinkSync(pad); } catch {}
+    }
+  }
+  return false;
+}
+
 function main() {
   process.chdir(dirname(fileURLToPath(import.meta.url)));
   const fixtures = process.argv.includes('--fixtures');
@@ -148,15 +187,23 @@ function main() {
 
   mkdirSync('data', { recursive: true });
   mkdirSync('build', { recursive: true });
-  writeFileSync('data/aanbiedingen.json', JSON.stringify(uit, null, 1));
-  const json = JSON.stringify({ gemaakt, fixtures, fout, winkels: uit.winkels, ...inkort(aanbiedingen) });
-  writeFileSync('build/aanbiedingen.json', json);
-  copyFileSync('pagina.html', 'build/index.html');
-  if (existsSync('pwa')) for (const f of readdirSync('pwa')) if (/\.(webmanifest|js|png|svg)$/.test(f) && !f.startsWith('maak')) copyFileSync(join('pwa', f), join('build', f));
-  // Vooraf gecomprimeerd (serve.mjs levert .gz bij Accept-Encoding: gzip).
-  for (const f of ['index.html', 'aanbiedingen.json', 'sw.js', 'manifest.webmanifest']) {
-    try { writeFileSync(join('build', f + '.gz'), gzipSync(readFileSync(join('build', f)), { level: 9 })); } catch {}
-  }
+  const LOCK = 'data/vergelijk.lock';
+  if (!pakLock(LOCK)) { console.log('vergelijk.mjs: een andere run is bezig (data/vergelijk.lock), overgeslagen'); return; }
+  try {
+    schrijfAtomair('data/aanbiedingen.json', JSON.stringify(uit, null, 1));
+    const json = JSON.stringify({ gemaakt, fixtures, fout, winkels: uit.winkels, ...inkort(aanbiedingen) });
+    // Eerst het paar json + pagina, dan de rest, en de .gz-bestanden als laatste: een .gz verwijst dan nooit naar nieuwere
+    // inhoud dan het bestand ernaast, en serve.mjs leest nooit een half geschreven bestand.
+    schrijfAtomair('build/aanbiedingen.json', json);
+    copyFileSync('pagina.html', 'build/index.html.tmp'); renameSync('build/index.html.tmp', 'build/index.html');
+    if (existsSync('pwa')) for (const f of readdirSync('pwa')) if (/\.(webmanifest|js|png|svg)$/.test(f) && !f.startsWith('maak')) {
+      copyFileSync(join('pwa', f), join('build', f + '.tmp')); renameSync(join('build', f + '.tmp'), join('build', f));
+    }
+    // Vooraf gecomprimeerd (serve.mjs levert .gz bij Accept-Encoding: gzip).
+    for (const f of ['aanbiedingen.json', 'index.html', 'sw.js', 'manifest.webmanifest']) {
+      try { schrijfAtomair(join('build', f + '.gz'), gzipSync(readFileSync(join('build', f)), { level: 9 })); } catch {}
+    }
+  } finally { try { unlinkSync(LOCK); } catch {} }
   const tel = {};
   for (const a of aanbiedingen) tel[a.oordeel] = (tel[a.oordeel] ?? 0) + 1;
   console.log(`${aanbiedingen.length} aanbiedingen uit ${winkels.length} winkels`, tel);
