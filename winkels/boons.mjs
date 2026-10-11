@@ -32,6 +32,7 @@ function nieuwsteInvoer() {
     try { invoeren.push({ naam, inv: JSON.parse(fs.readFileSync(path.join(dir, naam), 'utf8')) }); }
     catch (e) { kapot.push(`${naam} (${e.message})`); } // kapot bestand overslaan, de rest gewoon verwerken
   }
+  if (!invoeren.length && kapot.length) throw new Error(`alle invoerbestanden zijn kapot: ${kapot.join('; ')}`);
   const k = kiesInvoer(invoeren);
   const waarschuwing = kapot.length ? `Boon's Markt: kapot invoerbestand overgeslagen: ${kapot.join('; ')}` : null;
   return { bestand: path.join(dir, k.naam), inv: k.inv, waarschuwing };

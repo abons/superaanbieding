@@ -22,6 +22,7 @@ See `README.md` for use, `docs/contract.md` for the data format (the contract be
   (planned `--https=8445`), never `funnel`, never `0.0.0.0`.
 - ⚠️ **The judging rule lives in `vergelijk.mjs` and is written down in `docs/contract.md`**: change both and `test.mjs`
   together. Same `eenheid`; narrow `categorie` first, the `familie` when the category has < 3 comparable products or none from another shop/brand; `beste` (cheapest or equal) / `goed` (within 5% of cheapest) only with a real comparison (>= 3, one other shop/brand), else `onbekend`.
+- ⚠️ **A collector writes nothing (exit 1) on 0 offers or < 50% of the previous `data/<shop>.json`** (2026-10-11): a real, lasting drop needs `SA_FORCEER=1` or deleting that file.
 - ⚠️ **A failing collector must never break the others or the merge**: `serve.mjs` spawns each as its own process,
   writes `data/laatste-fout.txt`, and the page shows it as a warning. Missing or corrupt `data/<winkel>.json` is skipped with a warning.
 - `data/` and `build/` are gitignored (generated). `build/index.html` is a small static page; the data is `build/aanbiedingen.json` (compact form, see contract), both cached by `sw.js`.

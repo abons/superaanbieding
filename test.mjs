@@ -243,8 +243,7 @@ for (const pr of [0, -1, NaN, '1,25', null]) assert.deepEqual(beoordeel([w('ah',
 assert.equal(een([w('ah', [p({ prijsPerEenheid: 3 })], [...refs(1, 2), p({ id: 's', merk: 'Pepsi', prijsPerEenheid: '0,5' })])]).oordeel, 'onbekend'); // de string-kandidaat telt niet
 assert.deepEqual(beoordeel([w('ah', [p({ categorie: null, titel: 'Tuinstoel' })], refs(1, 2, 3).map((r) => ({ ...r, categorie: null, titel: 'Kruk' })))]).map((x) => x.oordeel), ['onbekend']); // geen categorie en geen familie
 
-// geldigTot in een ander formaat dan jjjj-mm-dd verdwijnt als string-vergelijking stil: zo'n datum is geen verlopen datum.
-// (leesWinkels waarschuwt ervoor, zie hieronder)
+// leesWinkels waarschuwt bij een ontbrekende, ongeldige of te oude `gemaakt`.
 {
   const t2 = mkdtempSync(join(tmpdir(), 'sa-test2-'));
   const sw = (winkel, o) => writeFileSync(join(t2, winkel + '.json'), JSON.stringify({ winkel, naam: winkel, aanbiedingen: [], ...o }));

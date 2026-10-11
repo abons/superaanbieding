@@ -69,7 +69,8 @@ const ververs = async () => {
     if (fouten.length) writeFileSync('data/laatste-fout.txt', `${new Date().toISOString()}\n${fouten.join('\n')}\n`);
     else rmSync('data/laatste-fout.txt', { force: true });
     const f = await draai('vergelijk.mjs', FIXTURES ? ['--fixtures'] : []);
-    if (f) appendFileSync('data/laatste-fout.txt', `${fouten.length ? '' : new Date().toISOString() + '\n'}vergelijk.mjs: ${f}\n`); // aanvullen: de collector-fouten blijven staan
+    // Code 2 = lock bezet: een andere vergelijk-run (bv. met de hand) doet het samenvoegen al, dus geen fout om te tonen.
+    if (f && f !== 'afgesloten met code 2') appendFileSync('data/laatste-fout.txt', `${fouten.length ? '' : new Date().toISOString() + '\n'}vergelijk.mjs: ${f}\n`); // aanvullen: de collector-fouten blijven staan
   } finally { bezig = false; }
 };
 

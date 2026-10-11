@@ -180,7 +180,7 @@ async function main() {
   // Te weinig aanbiedingen (0 of < 50% van het vorige bestand): niets wegschrijven.
   let vorig = 0;
   try { vorig = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'lidl.json'), 'utf8')).aanbiedingen.length; } catch { /* geen of kapot vorig bestand */ }
-  if (!aanbiedingen.length || aanbiedingen.length < vorig * 0.5) throw new Error(`${aanbiedingen.length} aanbiedingen (vorige run ${vorig}), structuur gewijzigd?`);
+  if (!aanbiedingen.length || (aanbiedingen.length < vorig * 0.5 && !process.env.SA_FORCEER)) throw new Error(`${aanbiedingen.length} aanbiedingen (vorige run ${vorig}), structuur gewijzigd? (bij een echte daling: SA_FORCEER=1 of data/lidl.json weghalen)`);
 
   const uit = { winkel: 'lidl', naam: 'Lidl', gemaakt: new Date().toISOString(), aanbiedingen, referentie };
   const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');

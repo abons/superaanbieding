@@ -235,10 +235,14 @@ async function main() {
   } catch (e) {
     if (e instanceof Budget) afgebroken = e.message; else throw e;
   }
-  // Budget op tijdens de bonus-fase: gedeeltelijke lijst, dus het goede vorige ah.json laten staan.
+  // Budget op tijdens de bonus-fase: gedeeltelijke lijst, dus een goed vorig ah.json laten staan. Is er geen vorig
+  // bestand, dan wel de gedeeltelijke lijst schrijven (met waarschuwing): beter dat dan nooit AH op de pagina.
   if (afgebroken) {
-    console.error(`ah.mjs afgebroken in de bonus-fase (${afgebroken}, ${bonusProducten.size} bonusproducten); data/ah.json niet overschreven`);
-    process.exit(1);
+    const heeftVorig = await readFile(UIT, 'utf8').then(() => true, () => false);
+    if (heeftVorig) {
+      console.error(`ah.mjs afgebroken in de bonus-fase (${afgebroken}, ${bonusProducten.size} bonusproducten); data/ah.json niet overschreven`);
+      process.exit(1);
+    }
   }
 
   const aanbiedingen = [];
@@ -253,8 +257,8 @@ async function main() {
   // Te weinig aanbiedingen (0 of < 50% van het vorige bestand): niets wegschrijven.
   let vorig = 0;
   try { vorig = JSON.parse(await readFile(UIT, 'utf8')).aanbiedingen.length; } catch { /* geen of kapot vorig bestand */ }
-  if (!aanbiedingen.length || aanbiedingen.length < vorig * 0.5) {
-    console.error(`ah.mjs: ${aanbiedingen.length} aanbiedingen (vorige run ${vorig}), structuur gewijzigd? data/ah.json niet overschreven`);
+  if (!aanbiedingen.length || (aanbiedingen.length < vorig * 0.5 && !process.env.SA_FORCEER)) {
+    console.error(`ah.mjs: ${aanbiedingen.length} aanbiedingen (vorige run ${vorig}), structuur gewijzigd? data/ah.json niet overschreven (bij een echte daling: SA_FORCEER=1 of data/ah.json weghalen)`);
     process.exit(1);
   }
 
@@ -290,6 +294,7 @@ async function main() {
     winkel: 'ah',
     naam: 'Albert Heijn',
     gemaakt: new Date().toISOString(),
+    ...(afgebroken ? { waarschuwing: `request-budget op (${afgebroken}): gedeeltelijke lijst` } : {}),
     aanbiedingen,
     referentie,
   };
