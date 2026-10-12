@@ -72,7 +72,7 @@ li.kaart { background: var(--kaart); border: 1px solid var(--lijn); border-radiu
 <main>
   <header>
     <h1>Superaanbieding</h1>
-    <span class="sub"><span id="gemaakt"></span> <button type="button" id="info" class="info" aria-label="Meldingen tonen" aria-expanded="false" hidden>i</button></span>
+    <span class="sub"><span id="gemaakt"></span> <button type="button" id="installeer" class="chip" hidden>Installeer</button> <button type="button" id="info" class="info" aria-label="Meldingen tonen" aria-expanded="false" hidden>i</button></span>
   </header>
   <div id="offline" class="waarsch" hidden>De pc is niet bereikbaar: dit is de laatst opgeslagen stand.</div>
   <div id="fout" class="waarsch" hidden></div>
@@ -298,6 +298,16 @@ fetch('aanbiedingen.json').then((r) => {
   laden = false; $('lijst').replaceChildren(el('li', { class: 'leeg' }, 'De aanbiedingen konden niet worden geladen (' + e.message + ').'));
 });
 
+// Installeerknop: alleen als de browser installeren aanbiedt (Chrome/Edge/Android); verdwijnt na installatie.
+let installEvent = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvent = e; $('installeer').hidden = false; });
+window.addEventListener('appinstalled', () => { installEvent = null; $('installeer').hidden = true; });
+$('installeer').onclick = async () => {
+  if (!installEvent) return;
+  installEvent.prompt();
+  await installEvent.userChoice.catch(() => {});
+  installEvent = null; $('installeer').hidden = true;
+};
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
   // De service worker zet X-Uit-Cache op een antwoord uit de cache: de pc was dan niet bereikbaar.
