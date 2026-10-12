@@ -283,11 +283,12 @@ function tooneData(d) {
   toestand.winkels = new Set([...toestand.winkels].filter((id) => winkelNamen.has(id)));
   laden = false;
   $('gemaakt').textContent = 'bijgewerkt ' + new Date(d.gemaakt).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  if (d.fout) {
-    $('fout').textContent = d.fout;
-    $('info').hidden = false;
-    $('info').onclick = () => { const open = $('fout').hidden; $('fout').hidden = !open; $('info').setAttribute('aria-expanded', open); };
-  }
+  // Opnieuw tonen (bv. na verse data) mag geen oude melding laten staan.
+  $('fout').textContent = d.fout || '';
+  $('fout').hidden = true;
+  $('info').hidden = !d.fout;
+  $('info').setAttribute('aria-expanded', 'false');
+  $('info').onclick = () => { const open = $('fout').hidden; $('fout').hidden = !open; $('info').setAttribute('aria-expanded', String(open)); };
   chips(); teken();
 }
 fetch('aanbiedingen.json').then((r) => {
