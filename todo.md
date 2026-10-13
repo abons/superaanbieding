@@ -12,6 +12,8 @@ supermarkt, familie en oordeel. Stand: AH, Dirk, Jumbo, Aldi, Lidl en Boon's (we
 
 ## Openstaand
 
+- AH faalt in de Action: `winkels/ah.mjs:41` geeft `token 503` vanaf de GitHub-runner (runs 38244038632 en 38307753741 rood via `controle`; Pages draait wel met oude AH-data uit de cache). Mogelijk blokkeert AH datacenter-IP's: onderzoeken (andere header/UA, retry-gedrag, of AH alleen lokaal ophalen en `data/ah.json` meegeven). De "request-budget op"-melding op de pagina was een eerdere run, niet de huidige oorzaak.
+- Als een verzamelaar in CI mislukt, zegt de pagina dat niet (alleen de GitHub-mail via `controle`); `data/laatste-fout.txt` wordt in de Action niet gevuld: de i-melding laten tonen dat AH niet ververst is.
 - Sorteren op grootste besparing zet kleine verpakkingen bovenaan (vanillestokje 318/kg = 0,64 per zakje): sorteren/tonen op besparing per verpakking (`besparing * prijs / prijsPerEenheid`; `pagina.html` sorteer-optie en kaarttekst, `docs/contract.md`, `test.mjs`).
 - Kruiden hebben sinds 2026-10-11 geen familie-terugval meer (`GEEN_TERUGVAL` in `familie.mjs`); eventueel splitsen in enkel kruid, kruidenmix en zout/Aromat/vetsin. Grabbel-categorieën 'Overige ...' tellen niet meer als categorie-vergelijking.
 - Deelfamilies (2026-10-11, `familie.mjs`) zijn nog grof: Knorr-sauzen tegenover pastasaus, plantaardige plakken en `kaas-snack`-regels (gewone `blokjes` zijn dichter bij plakken dan bij hapjes) niet op echte data nagelopen; steekproeven op `vergelijking: "familie"` herhalen, na een verse `node vergelijk.mjs`.
