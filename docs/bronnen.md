@@ -163,6 +163,13 @@ Twee routes, allebei plain fetch vanuit Node:
 
 ## Boon's — geen machineleesbare bron (onderzoek 2026-10-11), geen `winkels/boons.mjs`
 
+⚠️ **Bijgewerkt 2026-10-28: de FlippingBook-pagina's zijn wél te halen** (de "DRM, 403" hieronder klopt niet). De viewer-HTML geeft
+een signed CloudFront-policy (`var initialPolicies`), en daarmee zijn `common/pages/html5substrates/pageNNNN_4.jpg` (2050 px) en de
+tekstlaag `common/pages/vector/NNNN.svg` (woorden in `<svg:tspan>`) gewoon op te halen: `node boons-folder.mjs`.
+⚠️ De jpg is alleen achtergrond (lege prijsvlakken); namen en prijzen staan in de svg, dus lees `spreadSS.html` (beide gestapeld). Nog steeds
+geen prijzen als gestructureerde data: de invoer blijft vision/handwerk naar `invoer/boons-w<week>.json`. `boonsmarkt.nl/folder`
+linkt ook Dagmarkt-folders en soms al de volgende week; de juiste titel is "Boons Markt Folder Compleet W<nn>".
+
 - Site is `boonsmarkt.nl` (niet boons-markt.nl: dat domein heeft een verkeerd certificaat). Vestiging Zuidland = locatie-id 26839,
   hoort bij de folder "Boon's Markt" (niet Dagmarkt); alle ~26 Markt-vestigingen delen een landelijke folder per week
   (`/folder`, `data-locids`, week 42 = 12-18 okt). Geen prijzen of aanbiedingen als tekst op de site (`/acties` = spaaractie).

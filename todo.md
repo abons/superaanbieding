@@ -1,14 +1,15 @@
 # todo — superaanbieding
 
 Doel: huidige supermarkt-aanbiedingen tonen met oordeel (goede deal / huismerk of merk goedkoper per kg/l), filter op
-supermarkt, familie en oordeel. Stand: AH, Dirk, Jumbo, Aldi, Lidl en Boon's (week 42) werken; PWA op :8092, tailscale :8445, en sinds 2026-10-11 openbaar op https://abons.github.io/superaanbieding/ (GitHub Action `publiceer.yml`, dagelijks 04:00 UTC).
+supermarkt, familie en oordeel. Stand: AH, Dirk, Jumbo, Aldi, Lidl en Boon's (week 44) werken; PWA op :8092, tailscale :8445, en sinds 2026-10-11 openbaar op https://abons.github.io/superaanbieding/ (GitHub Action `publiceer.yml`, dagelijks 04:00 UTC).
 
 ## Hier begint de volgende sessie
 
-1. Boon's week 43 (en elke week), doen vanaf donderdag 2026-10-15 (een nieuwe folder verschijnt ongeveer donderdag voor de nieuwe week; W43 bestond op 2026-10-11 nog niet; nooit data verzinnen): nieuwe folder
-   zoeken via `boonsmarkt.nl/folder` (locatie 26839); de FlippingBook-link `.../view/572493953/` is de **W42**-folder, W43 krijgt een andere id.
-   Pagina's lezen naar `invoer/boons-w43.json` (formaat in kop van `winkels/boons.mjs`, voorbeeld `invoer/boons-w42.json`, geldigVan 2026-10-19,
-   geldigTot 2026-10-25). `kiesInvoer` kiest sinds 2026-10-11 geen week met `geldigVan` in de toekomst, dus W43 mag vooraf klaar staan. Week 42 verloopt 2026-10-18; daarna toont de tool geen Boon's meer tot de nieuwe invoer er is.
+1. Boon's elke week (nieuwe folder ~donderdag voor de week; nooit data verzinnen). W44 (26 okt-1 nov) staat in `invoer/boons-w44.json`
+   (2026-10-28, 90 regels); W43 is overgeslagen (verlopen voor hij gelezen was). Volgende: **W45, geldig 2026-11-02 t/m 11-08**.
+   Werkwijze: `node boons-folder.mjs` (zoekt de "Boons Markt"-folder op `boonsmarkt.nl/folder`, niet Dagmarkt) -> spreads als jpg + svg;
+   ⚠️ de jpg heeft geen prijzen, render jpg+svg samen (`spreadSS.html`, headless Chrome `--screenshot`) en lees dat; 3 agents parallel
+   (pagina 1-8/9-16/17-24) met het formaat uit de kop van `winkels/boons.mjs` ging in ~5 min. Normaalprijs "x/y" -> null + opmerking.
 
 ## Openstaand
 

@@ -8,6 +8,7 @@ See `README.md` for use, `docs/contract.md` for the data format (the contract be
 | --- | --- |
 | `winkels/<winkel>.mjs` | one collector per supermarket -> `data/<winkel>.json` (owned by whoever writes that shop) |
 | `vergelijk.mjs` | merges `data/*.json`, judges each offer (`beoordeel`), writes `data/aanbiedingen.json` + `build/`; `--fixtures` reads `fixtures/` |
+| `boons-folder.mjs` | downloads the weekly Boon's FlippingBook (page jpgs + text layer) to `$TEMP/boons-folder` for filling `invoer/boons-w<week>.json`; not in `winkels/` because `serve.mjs` runs everything there |
 | `familie.mjs` | coarse product family per product (keywords on category + title), `familieNaam`, `STUK_FAMILIES` (per piece over the whole family), `STUK_CATEGORIE_FAMILIES` (per piece only within one category) |
 | `docs/bronnen.md` | research per shop (endpoints, how each shop is fetched); state 2026-10-11, the collectors live in `winkels/` |
 | `serve.mjs` | serves `build/` on 127.0.0.1:8092; runs collectors one by one, then `vergelijk.mjs`, at start and hourly (merge hourly, each collector at most every 6 h, 2 h pause after a failure); `--fixtures` skips collectors, `--geen-ophalen` skips them too but keeps real data; serves the pre-gzipped `build/*.gz` |
