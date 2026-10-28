@@ -13,6 +13,9 @@ supermarkt, familie en oordeel. Stand: AH, Dirk, Jumbo, Aldi, Lidl en Boon's (we
 
 ## Openstaand
 
+- Boon's: geen `geldigVan` per regel in `winkels/boons.mjs`, dus zaterdagknallers/weekenddeals tellen vanaf maandag (W44: `invoer/boons-w44.json` Affligem r73, pokebowl r16, rundergehakt r24, vlaaien r31; geven te vroeg `beste`). Veld per regel + filter op vandaag.
+- Boon's-invoer met inhoudsbereik (450/500 ml, 28-185 g) kiest één uiterste: prijs per kg/l schijnprecies (W44 r43 olie 3,98/l vs 4,42, r28 pepernoten, r57 Maggi). Afspraak maken (kleinste inhoud, of eenheid `stuk`) en in de kop van `winkels/boons.mjs` zetten.
+- Boon's-categorieën (`CATS` in `winkels/boons.mjs`) zijn grof: ~55 van 90 W44-regels worden 'Overig' (vleeswaren, kaas, koffie, snoep); dan vergelijkt alleen `familie.mjs`. Aanvullen op W44-titels.
 - AH faalt in de Action: `winkels/ah.mjs:41` geeft `token 503` vanaf de GitHub-runner (runs 38244038632 en 38307753741 rood via `controle`; Pages draait wel met oude AH-data uit de cache). Mogelijk blokkeert AH datacenter-IP's: onderzoeken (andere header/UA, retry-gedrag, of AH alleen lokaal ophalen en `data/ah.json` meegeven). De "request-budget op"-melding op de pagina was een eerdere run, niet de huidige oorzaak.
 - Als een verzamelaar in CI mislukt, zegt de pagina dat niet (alleen de GitHub-mail via `controle`); `data/laatste-fout.txt` wordt in de Action niet gevuld: de i-melding laten tonen dat AH niet ververst is.
 - Sorteren op grootste besparing zet kleine verpakkingen bovenaan (vanillestokje 318/kg = 0,64 per zakje): sorteren/tonen op besparing per verpakking (`besparing * prijs / prijsPerEenheid`; `pagina.html` sorteer-optie en kaarttekst, `docs/contract.md`, `test.mjs`).

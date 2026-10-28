@@ -34,5 +34,5 @@ See `README.md` for use, `docs/contract.md` for the data format (the contract be
 - `data/` and `build/` are gitignored (generated). `build/index.html` is a small static page; the data is `build/aanbiedingen.json` (compact form, see contract), both cached by `sw.js`.
 - `aanbiedingen.json` in `data/` is the merger's output and is never read back as a shop file.
 - Port 8092 is a table row elsewhere too (growatt is 8090); do not reuse it for something else.
-- Windows PowerShell 5.1 corrupts files on a Get-/Set-Content round trip: edit with the editor tools. Heredocs with
+- Windows PowerShell 5.1 corrupts files on a Get-/Set-Content round trip: edit with the editor tools. Heredocs (also a Python heredoc: `\\b` became a backspace byte in a regex, 2026-10-28) with
   `\u` escapes break in Bash here: write such files with the Write tool.

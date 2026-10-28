@@ -55,6 +55,8 @@ function deler(actie, geldtVoor) {
 
 // Categorie uit de titel; eerste treffer wint. Namen zoveel mogelijk zoals AH/Dirk ze gebruiken.
 const CATS = [
+  // Specifiek eerst: anders pakt 'aardbei' een toetje, 'snacks' dierenvoeding en 'dove' een gemengd verzorgingsblok.
+  [/dierenvoeding|rosewood/i, 'Dierenvoeding'], [/rotterdamsche oude|milner|noord waarland/i, 'Kaas'], [/mousse|dessert/i, 'Toetjes'], [/andr[eé]lon.*axe|shampoo.*douche/i, 'Persoonlijke verzorging'],
   [/druiven/i, 'Druiven'], [/appels/i, 'Appels'], [/stoofperen|handperen|doyenne/i, 'Peren'], [/kiwi|aardbei/i, 'Fruit'],
   [/aardappel/i, 'Aardappelen'], [/frites/i, 'Diepvries aardappelproducten'], [/paprika/i, 'Paprika'],
   [/rundergehakt/i, 'Rundergehakt'], [/riblappen/i, 'Rundvlees'], [/kippenbouten|drumsticks/i, 'Kipdelen'],
@@ -63,11 +65,11 @@ const CATS = [
   [/pate/i, 'Pate'], [/salades?$|lunchsalade/i, 'Salades'], [/mieschotel|rijstschotel|italiaanse maaltijden|verspakket/i, 'Maaltijden'],
   [/geraspte.*kaas|geraspte jonge goudse/i, 'Geraspte kaas'], [/feta|plakken kaas|spanish cheese|brie/i, 'Kaas'],
   [/yoghurt|vla$/i, 'Yoghurt'], [/kwark/i, 'Kwark'], [/alpro/i, 'Plantaardige drink'], [/becel/i, 'Margarine'],
-  [/pizza/i, 'Pizza'], [/loempia|snacks/i, 'Snacks (diepvries)'], [/sap|smoothie/i, 'Vers sap en smoothies'],
-  [/coca-cola|cola/i, 'Cola regular'], [/gazeuse|fruit shoot|tintelfruit/i, 'Limonade en fruitdrank'], [/energydrink/i, 'Energydrank'],
+  [/pizza/i, 'Pizza'], [/loempia|snacks/i, 'Snacks (diepvries)'], [/\bsap\b|smoothie/i, 'Vers sap en smoothies'],
+  [/coca-cola|\bcola\b/i, 'Cola regular'], [/gazeuse|fruit shoot|tintelfruit/i, 'Limonade en fruitdrank'], [/energydrink/i, 'Energydrank'],
   [/wijn/i, 'Wijn'], [/merlot|grand sud|stoney creek/i, 'Wijn'], [/amstel|heineken|grolsch|radler|bier/i, 'Bier'],
   [/vodka|jenever|kruidenlikeur|likeur|whisky|gin\b/i, 'Gedistilleerd'], [/koffiecapsules/i, 'Koffiecapsules'], [/thee/i, 'Thee'],
-  [/brood|bollen|stolletje|speculaas|donuts|kersencarre|gebakjes|amandeltongen|zebraspritsen/i, 'Brood en gebak'],
+  [/brood|(^|\s)bollen|stolletje|speculaas|donuts|kersencarre|gebakjes|amandeltongen|zebraspritsen/i, 'Brood en gebak'],
   [/soepgroenten|groenten|bloemkool|spinazie|witlof/i, 'Groenten'], [/lunchsalade/i, 'Salades'],
   [/chips|doritos|lay's/i, 'Chips'], [/m&m|maltesers|autodrop|skittles|oldtimers|digestives|verkade|nobo|chocolade/i, 'Snoep en koek'],
   [/kellogg/i, 'Ontbijtgranen'], [/bonne maman|broodbeleg/i, 'Broodbeleg'], [/olie|olio/i, 'Olie'],
@@ -75,7 +77,7 @@ const CATS = [
   [/roomkaas/i, 'Roomkaas'], [/toiletpapier/i, 'Toiletpapier'], [/vaatwas/i, 'Vaatwastabletten'], [/ambi pur/i, 'Toiletblokken'],
   [/felix/i, 'Kattenvoer'], [/dove|rexona/i, 'Deodorant'], [/libresse|tena|yoni/i, 'Damesverzorging'], [/conditioner|shampoo/i, 'Haarverzorging'],
 ];
-const categorie = t => (CATS.find(([re]) => re.test(t)) || [0, 'Overig'])[1];
+export const categorie = t => (CATS.find(([re]) => re.test(t)) || [0, 'Overig'])[1];
 
 function main() {
   const { bestand, inv, waarschuwing: kapotWaarschuwing } = nieuwsteInvoer();

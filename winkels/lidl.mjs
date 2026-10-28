@@ -20,7 +20,7 @@
 //    van de titel). Producten zonder merk (bv. "Groene olijven met knoflook") zijn niet te beoordelen -> huismerk false.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const API = 'https://www.lidl.nl/q/api/search';
 const BASIS = 'https://www.lidl.nl';
@@ -121,16 +121,19 @@ function merkVan(d) {
   return HUISMERKEN.has(l) || A_MERKEN.has(l) || (/^[A-ZÄÖÜ]{3,}$/.test(eerste)) ? eerste : null;
 }
 
-function maakProduct(it) {
+export function maakProduct(it) {
   const d = it.gridbox.data;
   // Lidl Plus-acties (sinds ~2026-10-20 het merendeel van de weekacties): geen price.price/oldPrice, wel
   // regionsPrices.<regio>.currentLidlPlusPrice.price.{price,oldPrice,endDate}. Alleen gebruikt als er geen gewone actie is.
   const plus = Object.values(d.regionsPrices || {}).map((r) => r?.currentLidlPlusPrice?.price).find((p) => p?.price > 0) || null;
   const gewoonOud = d.price?.oldPrice > d.price?.price ? d.price.oldPrice : null;
-  const viaPlus = plus != null && gewoonOud == null && (plus.oldPrice > plus.price || !(d.price?.price > 0));
+  // Plus-oud: zijn eigen oldPrice, anders de gewone prijs als die hoger is. Zonder vergelijkprijs is een Plus-prijs geen
+  // aanbieding en ook geen referentie (een ledenprijs als normaalprijs zou andere aanbiedingen te streng beoordelen).
+  const plusOud = plus && (plus.oldPrice > plus.price ? plus.oldPrice : d.price?.price > plus.price ? d.price.price : null);
+  const viaPlus = plus != null && gewoonOud == null && plusOud != null;
   const prijs = viaPlus ? plus.price : d.price?.price;
   if (!(prijs > 0)) return null;
-  const oud = viaPlus ? (plus.oldPrice > prijs ? plus.oldPrice : null) : gewoonOud;
+  const oud = viaPlus ? plusOud : gewoonOud;
   const aanbieding = oud != null;
   const merkRuw = merkVan(d);
   const titel = (d.fullTitle || '').replace(/[®™]/g, '').replace(/^[-–\s]+/, '').trim();
@@ -197,4 +200,4 @@ async function main() {
   console.log(`lidl: ${aanbiedingen.length} aanbiedingen (${metPpe(aanbiedingen)} met prijs/eenheid), ${referentie.length} referentie (${metPpe(referentie)} met prijs/eenheid), huismerk ${aanbiedingen.filter(x => x.huismerk).length}+${referentie.filter(x => x.huismerk).length}`);
 }
 
-main().catch(e => { console.error('lidl.mjs mislukt:', e.message); process.exit(1); });
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(e => { console.error('lidl.mjs mislukt:', e.message); process.exit(1); });

@@ -266,7 +266,8 @@ function tooneData(d) {
   const vandaag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' });
   const aantal = d.aanbiedingen.length;
   // Zelfde regel als vergelijk.mjs: alleen een geldigTot dat met jjjj-mm-dd begint wordt vergeleken.
-  d.aanbiedingen = d.aanbiedingen.filter((a) => !(typeof a.geldigTot === 'string' && /^\d{4}-\d{2}-\d{2}/.test(a.geldigTot) && a.geldigTot.slice(0, 10) < vandaag));
+  // Fixtures worden op hun eigen dag beoordeeld (vergelijk.mjs FIXTURES_DAG), dus hier niet als verlopen weggooien.
+  if (!d.fixtures) d.aanbiedingen = d.aanbiedingen.filter((a) => !(typeof a.geldigTot === 'string' && /^\d{4}-\d{2}-\d{2}/.test(a.geldigTot) && a.geldigTot.slice(0, 10) < vandaag));
   const weg = aantal - d.aanbiedingen.length;
   const uren = d.gemaakt ? (Date.now() - new Date(d.gemaakt).getTime()) / 36e5 : NaN;
   const leeftijd = Number.isFinite(uren) ? Math.round(uren) + ' uur oud' : 'leeftijd onbekend';

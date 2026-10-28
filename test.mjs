@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beoordeel, inkort, leesWinkels, pakLock, LOCK_STALE_MS, MIN_VERHOUDING, MIN_VERHOUDING_FAMILIE, normEenheid, valideerProducten, FIXTURES_DAG } from './vergelijk.mjs';
-import { kiesInvoer } from './winkels/boons.mjs';
+import { kiesInvoer, categorie as boonsCategorie } from './winkels/boons.mjs';
+import { maakProduct as maakLidlProduct } from './winkels/lidl.mjs';
 import { isGratisCadeauZonderKorting } from './winkels/jumbo.mjs';
 import { maakProduct as maakAhProduct } from './winkels/ah.mjs';
 import { familieVan, familieNaam } from './familie.mjs';
@@ -316,5 +317,23 @@ assert.deepEqual(beoordeel([w('ah', [p({ categorie: null, titel: 'Tuinstoel' })]
   assert.deepEqual(valideerProducten([p({ geldigTot: '2026-10-18' })], true), { datum: 0, kaal: 0 });
   rmSync(t4, { recursive: true, force: true });
 }
+
+// Boon's-categorie: losse woorden, niet 'cola' in chocolade of 'sap' in Sapphire (W44 gaf zo valse oordelen).
+assert.equal(boonsCategorie("Côte d'Or BonBonBloc of chocoladereep"), 'Snoep en koek');
+assert.equal(boonsCategorie('Eristoff vodka of Bombay Sapphire gin'), 'Gedistilleerd');
+assert.equal(boonsCategorie('De Rotterdamsche Oude borrelstuk, kaasbollen'), 'Kaas');
+assert.equal(boonsCategorie('Nestle Bros krakende mousse en/of Smarties yoghurt met aardbeiensmaak'), 'Toetjes');
+assert.equal(boonsCategorie('Alle Rosewood dierenvoeding en/of snacks'), 'Dierenvoeding');
+
+// Lidl Plus: actie met eigen oldPrice, of met de gewone prijs als vergelijk; zonder vergelijkprijs geen product (geen ledenprijs als referentie).
+const lidl = (price, plus) => maakLidlProduct({ gridbox: { data: { productId: 1, fullTitle: 'Test 500 g', category: 'Food', price,
+  regionsPrices: plus ? { 1: { currentLidlPlusPrice: { price: plus } } } : {} } } });
+let lp = lidl({}, { price: 0.99, oldPrice: 1.29, endDate: '2026-11-01T22:59:59Z' });
+assert.deepEqual([lp.prijs, lp.normaalPrijs, lp.geldigTot, lp.mechanisme], [0.99, 1.29, '2026-11-01', '23% korting met Lidl Plus']);
+lp = lidl({ price: 2.0 }, { price: 1.5 });
+assert.deepEqual([lp.prijs, lp.normaalPrijs], [1.5, 2]);
+assert.equal(lidl({}, { price: 1.5 }), null);
+lp = lidl({ price: 1.79, oldPrice: 2.15 }, { price: 1.5, oldPrice: 2.15 });
+assert.deepEqual([lp.prijs, lp.mechanisme], [1.79, '17% korting']);
 
 console.log('test.mjs: alles ok');
