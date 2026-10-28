@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beoordeel, inkort, leesWinkels, pakLock, LOCK_STALE_MS, MIN_VERHOUDING, MIN_VERHOUDING_FAMILIE, normEenheid, valideerProducten } from './vergelijk.mjs';
+import { beoordeel, inkort, leesWinkels, pakLock, LOCK_STALE_MS, MIN_VERHOUDING, MIN_VERHOUDING_FAMILIE, normEenheid, valideerProducten, FIXTURES_DAG } from './vergelijk.mjs';
 import { kiesInvoer } from './winkels/boons.mjs';
 import { isGratisCadeauZonderKorting } from './winkels/jumbo.mjs';
 import { maakProduct as maakAhProduct } from './winkels/ah.mjs';
@@ -182,7 +182,7 @@ assert.equal(ontbreekt.winkels.length, 0); assert.equal(ontbreekt.waarschuwingen
 // De fixtures leveren een mix van oordelen, en per product het verwachte oordeel (een verwisseling van oordelen valt dan op).
 const fx = leesWinkels(join(dirname(fileURLToPath(import.meta.url)), 'fixtures'), false);
 assert.equal(fx.winkels.length, 2);
-const fxUit = beoordeel(fx.winkels);
+const fxUit = beoordeel(fx.winkels, FIXTURES_DAG);
 const tel = new Set(fxUit.map((x) => x.oordeel));
 for (const o of ['beste', 'goed','huismerk-goedkoper', 'merk-goedkoper', 'onbekend']) assert.ok(tel.has(o), 'fixtures missen ' + o);
 const fxOordeel = (winkel, id) => fxUit.find((x) => x.winkel === winkel && x.id === id).oordeel;

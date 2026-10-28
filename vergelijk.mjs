@@ -26,6 +26,8 @@ const isOverig = (c) => { const t = String(c ?? '').trim().toLowerCase(); return
 const geldig = (n) => typeof n === 'number' && Number.isFinite(n) && n > 0;
 // Vandaag als jjjj-mm-dd in Nederlandse tijd (geldigTot is een datum zonder tijd).
 export const vandaagNL = () => new Date().toLocaleDateString('sv', { timeZone: 'Europe/Amsterdam' });
+// De dag waarop fixtures/ gemaakt is: --fixtures en test.mjs beoordelen op die dag, anders verlopen alle fixtures (geldigTot 2026-10-18).
+export const FIXTURES_DAG = '2026-10-11';
 // Een aanbieding telt niet meer mee als hij verlopen is (geldigTot voor vandaag) of geen aanbieding is (prijs >= normaalprijs).
 // Alleen een geldigTot dat met jjjj-mm-dd begint wordt vergeleken: 'dd-mm-jjjj' als string vergelijken geeft willekeurige uitkomsten.
 const verlopen = (p, vandaag) => typeof p.geldigTot === 'string' && /^\d{4}-\d{2}-\d{2}/.test(p.geldigTot) && p.geldigTot.slice(0, 10) < vandaag;
@@ -224,7 +226,7 @@ function main() {
   process.chdir(dirname(fileURLToPath(import.meta.url)));
   const fixtures = process.argv.includes('--fixtures');
   const { winkels, waarschuwingen } = leesWinkels(fixtures ? "fixtures" : "data", !fixtures);
-  const aanbiedingen = beoordeel(winkels);
+  const aanbiedingen = beoordeel(winkels, fixtures ? FIXTURES_DAG : vandaagNL());
   const gemaakt = new Date().toISOString();
   const uit = { gemaakt, fixtures, winkels: winkels.map((w) => ({ id: w.winkel, naam: w.naam })), aanbiedingen };
   let fout = '';
