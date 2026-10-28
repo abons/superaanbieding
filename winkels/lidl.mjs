@@ -8,7 +8,8 @@
 //  - Item: items[].gridbox.data: fullTitle, brand.name, category ("Food" bij voedsel), keyfacts.wonCategoryPrimary
 //    ("Werelden van nood/Eten en dichtbij voedsel/Kaas, zuivelproducten & eieren/Kaas"), price.{price,oldPrice,discount,
 //    packaging.text}, keyfacts.description (<li>750 g</li>), storeEndDate (unix), canonicalUrl, image.
-//  - Aanbieding = price.oldPrice > price. oldPrice 0/ontbrekend = gewoon product (referentie). Artikelen zonder prijs
+//  - Aanbieding = price.oldPrice > price, of anders een Lidl Plus-actie (regionsPrices.<r>.currentLidlPlusPrice.price,
+//    mechanisme "... met Lidl Plus"). oldPrice 0/ontbrekend = gewoon product (referentie). Artikelen zonder prijs
 //    (komende-week-acties zonder prijs in de API) worden overgeslagen: prijs is verplicht in het contract.
 //  - price.basePrice is leeg voor voedsel, dus prijs per kg/l wordt altijd zelf uitgerekend uit de hoeveelheid. Die komt uit
 //    (in volgorde) price.packaging.text, de <li>'s van keyfacts.description, supplementalDescription, de titel. Geen
@@ -91,7 +92,7 @@ function parseInhoud(txt) {
 }
 
 function inhoudVan(d) {
-  const p = d.price?.packaging || {};
+  const p = d.price?.packaging || Object.values(d.regionsPrices || {}).map((r) => r?.currentLidlPlusPrice?.price?.packaging).find(Boolean) || {};
   const bronnen = [p.text, p.amount != null && p.unit ? `${p.amount} ${p.unit}` : null];
   const desc = d.keyfacts?.description || '';
   for (const li of desc.matchAll(/<li>(.*?)<\/li>/gis)) bronnen.push(li[1]);
@@ -122,9 +123,14 @@ function merkVan(d) {
 
 function maakProduct(it) {
   const d = it.gridbox.data;
-  const prijs = d.price?.price;
+  // Lidl Plus-acties (sinds ~2026-10-20 het merendeel van de weekacties): geen price.price/oldPrice, wel
+  // regionsPrices.<regio>.currentLidlPlusPrice.price.{price,oldPrice,endDate}. Alleen gebruikt als er geen gewone actie is.
+  const plus = Object.values(d.regionsPrices || {}).map((r) => r?.currentLidlPlusPrice?.price).find((p) => p?.price > 0) || null;
+  const gewoonOud = d.price?.oldPrice > d.price?.price ? d.price.oldPrice : null;
+  const viaPlus = plus != null && gewoonOud == null && (plus.oldPrice > plus.price || !(d.price?.price > 0));
+  const prijs = viaPlus ? plus.price : d.price?.price;
   if (!(prijs > 0)) return null;
-  const oud = d.price.oldPrice > prijs ? d.price.oldPrice : null;
+  const oud = viaPlus ? (plus.oldPrice > prijs ? plus.oldPrice : null) : gewoonOud;
   const aanbieding = oud != null;
   const merkRuw = merkVan(d);
   const titel = (d.fullTitle || '').replace(/[®™]/g, '').replace(/^[-–\s]+/, '').trim();
@@ -132,8 +138,8 @@ function maakProduct(it) {
   const hoeveel = inh && inh.eenheid !== 'stuk' ? inh.hoeveelheid : null;
   const ppe = p => (p != null && hoeveel ? r2(p / hoeveel) : null);
   const kat = (d.keyfacts?.wonCategoryPrimary || '').split('/').pop() || 'Overig';
-  const pct = d.price.discount?.percentageDiscount ?? (aanbieding ? Math.round((1 - prijs / oud) * 100) : null);
-  const einde = d.storeEndDate || d.regionsPrices?.[Object.keys(d.regionsPrices || {})[0]]?.currentPrice?.endDate;
+  const pct = (viaPlus ? null : d.price.discount?.percentageDiscount) ?? (aanbieding ? Math.round((1 - prijs / oud) * 100) : null);
+  const einde = viaPlus ? plus.endDate || d.storeEndDate : d.storeEndDate || d.regionsPrices?.[Object.keys(d.regionsPrices || {})[0]]?.currentPrice?.endDate;
   const img = d.image || d.imageList?.[0] || null;
   return {
     id: String(it.code || d.productId),
@@ -147,7 +153,7 @@ function maakProduct(it) {
     normaalPrijs: aanbieding ? r2(oud) : r2(prijs),
     prijsPerEenheid: ppe(prijs),
     normaalPerEenheid: aanbieding ? ppe(oud) : ppe(prijs),
-    mechanisme: aanbieding && pct ? `${pct}% korting` : null,
+    mechanisme: aanbieding && pct ? `${pct}% korting${viaPlus ? ' met Lidl Plus' : ''}` : null,
     geldigTot: aanbieding ? (typeof einde === 'number' ? dagVan(einde) : einde ? String(einde).slice(0, 10) : null) : null,
     afbeelding: img && /^https:/.test(img) ? img : null,
   };
