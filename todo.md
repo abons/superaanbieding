@@ -5,8 +5,9 @@ supermarkt, familie en oordeel. Stand: AH, Dirk, Jumbo, Aldi, Lidl en Boon's (we
 
 ## Hier begint de volgende sessie
 
-1. Boon's elke week (nieuwe folder ~donderdag voor de week; nooit data verzinnen). W44 (26 okt-1 nov) staat in `invoer/boons-w44.json`
-   (2026-10-28, 90 regels); W43 is overgeslagen (verlopen voor hij gelezen was). Volgende: **W45, geldig 2026-11-02 t/m 11-08**.
+1. Boon's elke week (nieuwe folder ~donderdag voor de week; nooit data verzinnen). W45 (2-8 nov) staat in `invoer/boons-w45.json`
+   (2026-11-03, 92 regels, uit branch `boons-folder`); W43 is overgeslagen. Volgende: **W46, geldig 2026-11-09 t/m 11-15**.
+   W45 bevat een zaterdagknaller (Dreft r74, 6,49 i.p.v. 23,19, alleen za 7 nov) en weekenddeals (r19, r28, r35, r75): zie het `geldigVan`-punt hieronder.
    Cloudsessie (geen toegang tot boonsmarkt.nl): Action `boons-folder` starten (of vrijdag afwachten), dan `git fetch origin boons-folder`
    en de `spreadNN.png` daar lezen. Werkwijze: `node boons-folder.mjs` (zoekt de "Boons Markt"-folder op `boonsmarkt.nl/folder`, niet Dagmarkt) -> spreads als jpg + svg;
    ⚠️ de jpg heeft geen prijzen, render jpg+svg samen (`spreadSS.html`, headless Chrome `--screenshot`) en lees dat; 3 agents parallel

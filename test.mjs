@@ -324,6 +324,15 @@ assert.equal(boonsCategorie('Eristoff vodka of Bombay Sapphire gin'), 'Gedistill
 assert.equal(boonsCategorie('De Rotterdamsche Oude borrelstuk, kaasbollen'), 'Kaas');
 assert.equal(boonsCategorie('Nestle Bros krakende mousse en/of Smarties yoghurt met aardbeiensmaak'), 'Toetjes');
 assert.equal(boonsCategorie('Alle Rosewood dierenvoeding en/of snacks'), 'Dierenvoeding');
+// W45: 'soepfabriek' bevat 'brie', 'Appelsientje' bevat 'appels', Sheba 'mousse'.
+assert.equal(boonsCategorie('Alle Kleinste soepfabriek biologische bouillon'), 'Kruidenierswaren');
+assert.equal(boonsCategorie('Alle Brie le rustique de caractère, Camembert le rustique'), 'Kaas');
+assert.equal(boonsCategorie('Appelsientje, Dubbeldrank, Maaza en/of van de Boom sappen'), 'Vers sap en smoothies');
+assert.equal(boonsCategorie('Hollandse Morgana appels'), 'Appels');
+assert.equal(boonsCategorie('Sheba Classiques, Finesse mousse, mini filets en/of sauce'), 'Kattenvoer');
+assert.equal(boonsCategorie('Princes tonijn in olijfolie, in zonnebloemolie en/of met groenten in pikante saus'), 'Vis (blik)');
+assert.equal(boonsCategorie("g'woon Japanse bollenmix, Yamato mix, rice cookies"), 'Overig');
+assert.equal(boonsCategorie('Alledaags witte bollen en/of tarwebollen'), 'Brood en gebak');
 
 // Lidl Plus: actie met eigen oldPrice, of met de gewone prijs als vergelijk; zonder vergelijkprijs geen product (geen ledenprijs als referentie).
 const lidl = (price, plus) => maakLidlProduct({ gridbox: { data: { productId: 1, fullTitle: 'Test 500 g', category: 'Food', price,
