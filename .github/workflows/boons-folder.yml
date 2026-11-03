@@ -1,0 +1,49 @@
+# Haalt de Boon's Markt-folder op (boons-folder.mjs), rendert elke spread met prijzen tot png (boons-render.mjs) en zet die met de
+# tekstlaag op de branch `boons-folder` (elke run een nieuwe losse commit, force: geen oude folders in de geschiedenis).
+# Doel: invoer/boons-w<week>.json kunnen vullen vanuit een sessie die boonsmarkt.nl zelf niet kan bereiken (cloudsessie).
+# ⚠️ De repo is openbaar: de folderbeelden staan dan ook openbaar op die branch. Alleen folderbeelden, nooit iets anders.
+name: boons-folder
+on:
+  workflow_dispatch:
+    inputs:
+      view_id:
+        description: 'FlippingBook view-id (leeg: eerste Boons Markt-folder op boonsmarkt.nl/folder)'
+        required: false
+  schedule:
+    - cron: '17 5 * * 5'   # vrijdag 05:17 UTC: de folder voor de volgende week staat er dan meestal
+  push:
+    branches-ignore: [boons-folder]
+    paths: ['boons-folder.mjs', 'boons-render.mjs', '.github/workflows/boons-folder.yml']
+permissions:
+  contents: write
+concurrency:
+  group: boons-folder
+  cancel-in-progress: true
+jobs:
+  folder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: ophalen
+        env: { VIEW_ID: '${{ inputs.view_id }}' }
+        run: |
+          set -o pipefail
+          node boons-folder.mjs $VIEW_ID "$RUNNER_TEMP/folder" | tee "$RUNNER_TEMP/ophalen.txt"
+      - name: renderen
+        run: node boons-render.mjs "$RUNNER_TEMP/folder" "$RUNNER_TEMP/uit"
+      - name: naar branch boons-folder
+        run: |
+          uit="$RUNNER_TEMP/uit"
+          cp "$RUNNER_TEMP"/folder/tekst*.txt "$uit/"
+          { echo "# Boon's-folder"; echo; echo "Opgehaald $(date -u +%FT%TZ) door run ${{ github.run_id }} (${{ github.ref_name }})."; echo;
+            echo '```'; cat "$RUNNER_TEMP/ophalen.txt"; echo '```'; echo;
+            echo "spreadNN.png = beeld met prijzen (pagina 1 en de laatste enkel, de rest twee folderpagina's), tekstNN.txt = tekstlaag."; } > "$uit/LEESMIJ.md"
+          cd "$uit"
+          git init -q -b boons-folder
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -q -m "Boon's-folder $(tail -n 1 "$RUNNER_TEMP/ophalen.txt")"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" boons-folder
