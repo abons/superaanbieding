@@ -30,7 +30,7 @@ jobs:
         env: { VIEW_ID: '${{ inputs.view_id }}' }
         run: |
           set -o pipefail
-          node boons-folder.mjs $VIEW_ID "$RUNNER_TEMP/folder" | tee "$RUNNER_TEMP/ophalen.txt"
+          node boons-folder.mjs "$VIEW_ID" "$RUNNER_TEMP/folder" | tee "$RUNNER_TEMP/ophalen.txt"
       - name: renderen
         run: node boons-render.mjs "$RUNNER_TEMP/folder" "$RUNNER_TEMP/uit"
       - name: naar branch boons-folder
